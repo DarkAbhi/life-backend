@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15.3
+    image: postgres:15.4
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     environment:
@@ -16,11 +16,19 @@ services:
     volumes:
       - .:/code
     env_file:
-      - ./.env
+      - ./.env.local
     ports:
       - 8000:8000
     depends_on:
       - db
+  telegram-bot:  # Add this new service for your Telegram bot
+    build:
+      context: ./telegram-bot  # Specify the path to your Telegram bot's Dockerfile
+    env_file:
+      - ./.env.local
+    restart: always
+    depends_on:
+      - web  # Make sure your Django app is up before starting the bot
 
 volumes:
   postgres_data:
