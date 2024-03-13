@@ -406,8 +406,7 @@ def handle_investments_update(message, investment_type):
     # Check for successful response
     if response.status_code in [200, 201]:
         # Log the appropriate message
-        message = "Investment created successfully." if response.status_code == 201 else "Investment updated/created successfully."
-        logger.info(message)
+        logger.info("Investment created successfully." if response.status_code == 201 else "Investment updated successfully.")
         # Send a success message to the bot
         success_message = 'Investment updated successfully.'
     else:
