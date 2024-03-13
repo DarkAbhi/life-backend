@@ -1,6 +1,6 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
-from .models import GymVisit, Meditation, Investment, Sport, Transaction, Vehicle, PhysiqueDetail
+from .models import GymVisit, Meditation, Investment, Sport, Transaction, Vehicle, PhysiqueDetail, CreditCard
 
 # Register your models here.
 
@@ -37,4 +37,9 @@ class VehicleAdminClass(ModelAdmin):
 
 @admin.register(PhysiqueDetail)
 class PhysiqueDetailAdminClass(ModelAdmin):
+    pass
+
+
+@admin.register(CreditCard)
+class CreditCardAdminClass(ModelAdmin):
     pass
