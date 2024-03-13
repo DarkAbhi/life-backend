@@ -16,6 +16,8 @@ BADMINTON = "Badminton"
 
 INVESTMENTS = "Investments"
 HEIGHT_WEIGHT = "Height/Weight"
+HEIGHT = "Height"
+WEIGHT = "Weight"
 
 STOCKS = "Stocks"
 MUTUTAL_FUNDS = "Mutual Funds"

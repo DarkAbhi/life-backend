@@ -4,7 +4,7 @@ from rest_framework import status, generics
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import GymVisit, Meditation, Investment, Sport, Transaction, Vehicle
+from .models import GymVisit, Meditation, Investment, Sport, Transaction, Vehicle, PhysiqueDetail
 
 
 # Create your views here.
@@ -14,29 +14,29 @@ from .models import GymVisit, Meditation, Investment, Sport, Transaction, Vehicl
 def add_workout_for_day(request):
     current_date = datetime.now(timezone.utc).date()
     if GymVisit.objects.filter(created_at__date=current_date).exists():
-        return Response(data={"error": "Gym entry already marked for today."}, status=400)
+        return Response(data={"error": "Gym entry already marked for today."}, status=status.HTTP_400_BAD_REQUEST)
     else:
         GymVisit.objects.create()
-        return Response(data={"message": "success"}, status=201)
+        return Response(data={"message": "success"}, status=status.HTTP_201_CREATED)
 
 
 @api_view(["POST"])
 def add_meditation_for_day(request):
     current_date = datetime.now(timezone.utc).date()
     if Meditation.objects.filter(created_at__date=current_date).exists():
-        return Response(data={"error": "You have already meditated today."}, status=400)
+        return Response(data={"error": "You have already meditated today."}, status=status.HTTP_400_BAD_REQUEST)
     else:
         Meditation.objects.create()
-        return Response(data={"message": "success"}, status=201)
+        return Response(data={"message": "success"}, status=status.HTTP_201_CREATED)
 
 
 @api_view(["POST"])
 def add_sport_for_day(request):
     if request.data.get("sport") in ["cricket", "football", "badminton"]:
         Sport.objects.create(name=request.data.get("sport"))
-        return Response(data={"message": "success"}, status=201)
+        return Response(data={"message": "success"}, status=status.HTTP_201_CREATED)
     else:
-        return Response(data={"error": "This sport is not available yet."}, status=400)
+        return Response(data={"error": "This sport is not available yet."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(["POST"])
@@ -51,32 +51,41 @@ def update_investment(request):
         if request.data.get("crypto"):
             investment_obj.total_in_crypto = request.data.get("crypto")
         investment_obj.save()
-        return Response(data={"message": "success"}, status=200)
+        return Response(data={"message": "success"}, status=status.HTTP_200_OK)
     else:
         Investment.objects.create(total_in_stocks=request.data.get("stocks", None),
                                   total_in_mutual_funds=request.data.get(
                                       "mutual_funds", None), total_in_crypto=request.data.get("crypto", None))
-        return Response(data={"message": "success"}, status=201)
+        return Response(data={"message": "success"}, status=status.HTTP_201_CREATED)
 
 
 @api_view(["POST"])
 def update_height_weight(request):
-    if Investment.objects.exists():
-        investment_obj = Investment.objects.all().first()
-        if request.data.get("stocks"):
-            investment_obj.total_in_stocks = request.data.get("stocks")
-        if request.data.get("mutual_funds"):
-            investment_obj.total_in_mutual_funds = request.data.get(
-                "mutual_funds")
-        if request.data.get("crypto"):
-            investment_obj.total_in_crypto = request.data.get("crypto")
-        investment_obj.save()
-        return Response(data={"message": "success"}, status=200)
+    # If height is not provided, try to get the last known height
+    if request.data.get("height") is None:
+        last_measurement = PhysiqueDetail.objects.all().order_by('-created_at').first()
+        if last_measurement:
+            height = last_measurement.height
+        else:
+            height = None
     else:
-        Investment.objects.create(total_in_stocks=request.data.get("stocks", None),
-                                  total_in_mutual_funds=request.data.get(
-                                      "mutual_funds", None), total_in_crypto=request.data.get("crypto", None))
-        return Response(data={"message": "success"}, status=201)
+        height = request.data.get("height")
+
+    if request.data.get("weight") is None:
+        last_measurement = PhysiqueDetail.objects.all().order_by('-created_at').first()
+        if last_measurement:
+            weight = last_measurement.weight
+        else:
+            weight = None
+    else:
+        weight = request.data.get("weight")
+
+    # Create the new physique details
+    PhysiqueDetail.objects.create(
+        weight=weight,  # This could be None if no previous measurement exists
+        height=height  # This could be None if no previous measurement exists
+    )
+    return Response(data={"message": "success"}, status=status.HTTP_201_CREATED)
 
 
 class TransactionsApiView(generics.ListCreateAPIView):
@@ -92,7 +101,8 @@ class TransactionsApiView(generics.ListCreateAPIView):
                                                              "date"),
                                                          category=request.data.get(
                                                              "category"),
-                                                         vehicle=Vehicle.objects.get(name=request.data.get("vehicle"))
+                                                         vehicle=Vehicle.objects.get(
+                                                             name=request.data.get("vehicle"))
                                                          )
             else:
                 return Response({"error": "Invalid input."}, status=status.HTTP_400_BAD_REQUEST)

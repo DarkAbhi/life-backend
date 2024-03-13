@@ -24,11 +24,22 @@ class Trip(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
-class PersonalDetails(models.Model):
-    height = models.DecimalField(max_digits=5, decimal_places=2)
-    weight = models.DecimalField(max_digits=5, decimal_places=2)
+class PhysiqueDetail(models.Model):
+    height = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True, help_text='Height in centimeters')
+    weight = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True, help_text='Weight in kilograms')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        # Format the created_at datetime to the desired format
+        formatted_date = timezone.localtime(
+            self.created_at).strftime('%d-%m-%Y at %I:%M %p')
+        return f"Height and weight on {formatted_date}"
 
 
 class CreditCard(models.Model):
@@ -45,6 +56,8 @@ class Investment(models.Model):
         max_digits=14, decimal_places=2, default=None, null=True)
     total_in_mutual_funds = models.DecimalField(
         max_digits=14, decimal_places=2, default=None, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
 
 class Sport(models.Model):
@@ -84,7 +97,8 @@ class Transaction(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField()
     description = models.TextField(null=True)
-    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, null=True, default=None)
+    vehicle = models.ForeignKey(
+        Vehicle, on_delete=models.CASCADE, null=True, default=None)
     category = models.IntegerField(choices=TRANSACTION_CATEGORIES)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
