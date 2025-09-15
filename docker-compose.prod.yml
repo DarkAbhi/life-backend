@@ -1,14 +1,4 @@
-version: '3.8'
-
 services:
-  db:
-    image: postgres:15.4
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
-    environment:
-      - POSTGRES_DB=${DB_NAME}
-      - POSTGRES_USER=${DB_USERNAME}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
   web:
     build: .
     restart: always
@@ -21,16 +11,14 @@ services:
       - ./.env
     expose:
       - 8000
-    depends_on:
-      - db
-  telegram-bot:  # Add this new service for your Telegram bot
+  telegram-bot:
     build:
-      context: ./telegram-bot  # Specify the path to your Telegram bot's Dockerfile
+      context: ./telegram-bot
     env_file:
       - ./.env
     restart: always
     depends_on:
-      - web  # Make sure your Django app is up before starting the bot
+      - web
   nginx:
     build: ./nginx
     restart: always
@@ -41,29 +29,7 @@ services:
       - media_volume:/code/mediafiles
     depends_on:
       - web
-  pgbackups:
-    image: prodrigestivill/postgres-backup-local
-    restart: always
-    user: postgres:postgres
-    volumes:
-      - /var/opt/pgbackups:/backups
-    links:
-      - db
-    depends_on:
-      - db
-    environment:
-      - POSTGRES_HOST=db
-      - POSTGRES_DB=${DB_NAME}
-      - POSTGRES_USER=${DB_USERNAME}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_EXTRA_OPTS=-Z6 --schema=public --blobs
-      - SCHEDULE=@daily
-      - BACKUP_KEEP_DAYS=7
-      - BACKUP_KEEP_WEEKS=4
-      - BACKUP_KEEP_MONTHS=6
-      - HEALTHCHECK_PORT=8080
 
 volumes:
-  postgres_data:
   static_volume:
   media_volume:

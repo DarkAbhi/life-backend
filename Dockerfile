@@ -1,4 +1,4 @@
-FROM python:3.10.11-slim-buster
+FROM python:3.10.18-slim-bookworm
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK 1
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -9,7 +9,7 @@ WORKDIR /code
 COPY requirements.txt .
 
 RUN apt update -y && \
-    apt install -y netcat && \
+    apt install -y netcat-openbsd && \
     pip install --upgrade pip && \
     pip install -r requirements.txt
 

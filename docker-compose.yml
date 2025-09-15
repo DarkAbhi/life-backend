@@ -1,10 +1,10 @@
-version: '3.8'
-
 services:
   db:
-    image: postgres:15.4
+    image: postgres:17.6
     volumes:
       - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - .env.local
     environment:
       - POSTGRES_DB=${DB_NAME}
       - POSTGRES_USER=${DB_USERNAME}
