@@ -15,6 +15,10 @@ func badRequest(w http.ResponseWriter, msg string) {
 	writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg})
 }
 
+func unauthorized(w http.ResponseWriter, msg string) {
+	writeJSON(w, http.StatusUnauthorized, map[string]string{"error": msg})
+}
+
 func serverError(w http.ResponseWriter, err error) {
 	writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 }

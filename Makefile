@@ -35,20 +35,20 @@ deploy: build up
 # ----- Migrations (prod image) -----
 docker-migrate-up:
 	@echo "🔼 Running all pending migrations in docker"
-	@COMPOSE_PROFILES=prod docker compose run --rm migrate --migrate-up
+	@COMPOSE_PROFILES=prod docker compose run --rm --build migrate --migrate-up
 
 docker-rollback:
 	@echo "↩️  Rolling back last migration in docker"
-	@COMPOSE_PROFILES=prod docker compose run --rm migrate --rollback
+	@COMPOSE_PROFILES=prod docker compose run --rm --build migrate --rollback
 
 docker-steps:
 	@echo "🔂 Running docker migration steps: $(n)"
 	@test -n "$(n)" || (echo "provide n, e.g. make docker-steps n=-2"; exit 1)
-	@COMPOSE_PROFILES=prod docker compose run --rm migrate --steps=$(n)
+	@COMPOSE_PROFILES=prod docker compose run --rm --build migrate --steps=$(n)
 
 docker-version:
 	@echo "📌 Showing docker migration version"
-	@COMPOSE_PROFILES=prod docker compose run --rm migrate --version
+	@COMPOSE_PROFILES=prod docker compose run --rm --build migrate --version
 
 # ----- DEV -----
 dev:
@@ -63,18 +63,18 @@ dev-logs:
 # ----- DEV migrations -----
 dev-migrate-up:
 	@echo "🔼 Running all pending migrations (dev)"
-	@docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm migrate --migrate-up
+	@docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --build migrate --migrate-up
 
 dev-rollback:
 	@echo "↩️  Rolling back last migration (dev)"
-	@docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm migrate --rollback
+	@docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --build migrate --rollback
 
 # Usage: make dev-steps n=-2  (negative = rollback; positive = apply)
 dev-steps:
 	@echo "🔂 Running dev migration steps: $(n)"
 	@test -n "$(n)" || (echo "provide n, e.g. make dev-steps n=-2"; exit 1)
-	@docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm migrate --steps=$(n)
+	@docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --build migrate --steps=$(n)
 
 dev-version:
 	@echo "📌 Showing dev migration version"
-	@docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm migrate --version
+	@docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --build migrate --version
