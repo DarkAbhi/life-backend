@@ -1,34 +1,79 @@
 services:
-  db:
-    image: postgres:17.6
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
-    env_file:
-      - .env.local
-    environment:
-      - POSTGRES_DB=${DB_NAME}
-      - POSTGRES_USER=${DB_USERNAME}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-  web:
-    build: .
-    restart: always
-    command: python manage.py runserver 0.0.0.0:8000
-    volumes:
-      - .:/code
-    env_file:
-      - ./.env.local
-    ports:
-      - 8000:8000
-    depends_on:
-      - db
-  telegram-bot:  # Add this new service for your Telegram bot
+  migrate:
+    profiles: ["prod"]
     build:
-      context: ./telegram-bot  # Specify the path to your Telegram bot's Dockerfile
-    env_file:
-      - ./.env.local
-    restart: always
-    depends_on:
-      - web  # Make sure your Django app is up before starting the bot
+      context: ./go-backend
+      dockerfile: Dockerfile
+    container_name: life-migrate
+    environment:
+      DB_HOSTNAME: ${DB_HOSTNAME}
+      DB_PORT: ${DB_PORT:-6543}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_SSLMODE: ${DB_SSLMODE:-require}
+    command: ["--migrate-up"]
+    restart: "no"
 
-volumes:
-  postgres_data:
+  backend:
+    profiles: ["prod"]
+    build:
+      context: ./go-backend
+      dockerfile: Dockerfile
+    container_name: life-api
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      APP_ENV: ${APP_ENV}
+      PORT: 8080
+      DB_NAME: ${DB_NAME}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOSTNAME: ${DB_HOSTNAME}
+      DB_PORT: ${DB_PORT}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  web:
+    profiles: ["prod"]
+    build:
+      context: ./life-tracker-frontend
+      dockerfile: Dockerfile
+    container_name: life-web
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_BASE_URL: http://backend:8080
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      start_period: 15s
+      retries: 15
+
+  bot:
+    profiles: ["prod"]
+    build:
+      context: ./telegram-bot
+      dockerfile: Dockerfile
+    container_name: life-bot
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      BOT_API_KEY: ${BOT_API_KEY}
+      BACKEND_BASE_URL: http://backend:8080
+    restart: unless-stopped

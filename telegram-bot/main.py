@@ -23,7 +23,6 @@ def response_to_start_action(message):
     bot.send_message(message.chat.id, "Howdy, you can choose any of these and update your life data tracker.\n\n" +
                      "/quick - Show quick entry options.\n" +
                      "/sport - Mark a sport you played.\n" +
-                     "/personal - Update personal details.\n" +
                      "/transactions - Add/view recent transactions", reply_markup=markup)
 
 
@@ -50,18 +49,6 @@ def response_to_quick_action(message):
     bot.send_message(message.chat.id, "What would you like to mark?",
                      reply_markup=markup)
     bot.register_next_step_handler(message, handle_quick_options)
-
-
-@bot.message_handler(commands=['personal'])
-def response_to_personal_action(message):
-    markup = types.ReplyKeyboardMarkup(row_width=2, selective=False)
-    itembtn1 = types.KeyboardButton(f'{constants.INVESTMENTS}')
-    itembtn2 = types.KeyboardButton(f'{constants.HEIGHT_WEIGHT}')
-    itembtn3 = types.KeyboardButton(f'{constants.CANCEL}')
-    markup.add(itembtn1, itembtn2, itembtn3)
-    bot.send_message(message.chat.id, "What would you like to update?",
-                     reply_markup=markup)
-    bot.register_next_step_handler(message, handle_personal_options)
 
 
 @bot.message_handler(commands=['transactions'])
@@ -235,90 +222,6 @@ def handle_vehicle_input(message, transaction_name, transaction_date, transactio
             message.chat.id, 'An unexpected error occured.', reply_markup=types.ReplyKeyboardRemove())
 
 
-def handle_personal_options(message):
-    if message.text == constants.INVESTMENTS:
-        markup = types.ReplyKeyboardMarkup(row_width=2, selective=False)
-        itembtn1 = types.KeyboardButton(f'{constants.STOCKS}')
-        itembtn2 = types.KeyboardButton(f'{constants.MUTUTAL_FUNDS}')
-        itembtn3 = types.KeyboardButton(f'{constants.CRYPTO}')
-        itembtn4 = types.KeyboardButton(f'{constants.CANCEL}')
-        markup.add(itembtn1, itembtn2, itembtn3, itembtn4)
-        bot.send_message(message.chat.id, "What would you like to update?",
-                         reply_markup=markup)
-        bot.register_next_step_handler(message, handle_investments_type)
-    elif message.text == constants.HEIGHT_WEIGHT:
-        markup = types.ReplyKeyboardMarkup(row_width=2, selective=False)
-        itembtn1 = types.KeyboardButton(f'{constants.HEIGHT}')
-        itembtn2 = types.KeyboardButton(f'{constants.WEIGHT}')
-        itembtn3 = types.KeyboardButton(f'{constants.CANCEL}')
-        markup.add(itembtn1, itembtn2, itembtn3)
-        bot.send_message(message.chat.id, "Do you want to update your height or weight?",
-                         reply_markup=markup)
-        bot.register_next_step_handler(message, handle_height_weight_input)
-    elif message.text == constants.CANCEL:
-        bot.send_message(
-            message.chat.id, 'Okay.', reply_markup=types.ReplyKeyboardRemove())
-    else:
-        logger.error(
-            f"Personal options invalid input received - {message.text}")
-        bot.send_message(
-            message.chat.id, 'Invalid input.', reply_markup=types.ReplyKeyboardRemove())
-
-
-def handle_height_weight_input(message):
-    if message.text == constants.HEIGHT:
-        bot.send_message(
-            message.chat.id, 'Enter height.', reply_markup=types.ReplyKeyboardRemove())
-        bot.register_next_step_handler(
-            message, handle_height_weight_update, constants.HEIGHT)
-    elif message.text == constants.WEIGHT:
-        bot.send_message(
-            message.chat.id, 'Enter weight.', reply_markup=types.ReplyKeyboardRemove())
-        bot.register_next_step_handler(
-            message, handle_height_weight_update, constants.WEIGHT)
-    elif message.text == constants.CANCEL:
-        bot.send_message(
-            message.chat.id, 'Okay.', reply_markup=types.ReplyKeyboardRemove())
-    else:
-        logger.error(
-            f"Height or weight invalid input received - {message.text}")
-        bot.send_message(
-            message.chat.id, 'Invalid input.', reply_markup=types.ReplyKeyboardRemove())
-
-
-def handle_height_weight_update(message, type):
-    try:
-        value = float(message.text)
-        if type == constants.HEIGHT:
-            response = requests.post(
-                f'{api_constants.BASE_URL}{api_constants.UPDATE_PHYSIQUE_DETAILS_ENDPOINT}', json={"height": value})
-        elif type == constants.WEIGHT:
-            response = requests.post(
-                f'{api_constants.BASE_URL}{api_constants.UPDATE_PHYSIQUE_DETAILS_ENDPOINT}', json={"weight": value})
-    except ValueError:
-        logger.error(
-            f"Height/weight is not a decimal value - {value}")
-        bot.send_message(
-            message.chat.id, 'Invalid input.', reply_markup=types.ReplyKeyboardRemove())
-    except requests.exceptions.ConnectionError:
-        logger.error(
-            f"Updating {type} API request connection error")
-        bot.send_message(
-            message.chat.id, 'An unexpected error occured.', reply_markup=types.ReplyKeyboardRemove())
-        return
-
-    # Check for successful response
-    if response.status_code == 201:
-        # Send a success message to the bot
-        bot.reply_to(message, f"{type} updated successfully.")
-    else:
-        # Send a server error message to the bot in case of failure
-        logger.error(
-            f"Height/Weight update API server error for type - {type}")
-        bot.send_message(message.chat.id, 'An unexpected error occured.',
-                         reply_markup=types.ReplyKeyboardRemove())
-
-
 def handle_sport_played(message):
     if message.text == constants.CRICKET:
         try:
@@ -365,60 +268,6 @@ def handle_sport_played(message):
     elif message.text == constants.BACK:
         bot.send_message(
             message.chat.id, "Okay.", reply_markup=types.ReplyKeyboardRemove())
-
-
-def handle_investments_type(message):
-    if message.text in [constants.STOCKS, constants.MUTUTAL_FUNDS, constants.CRYPTO]:
-        type = message.text
-        bot.send_message(
-            message.chat.id, 'Enter total amount invested.', reply_markup=types.ReplyKeyboardRemove())
-        bot.register_next_step_handler(
-            message, handle_investments_update, type)
-    elif message.text == constants.CANCEL:
-        bot.reply_to(message, "Okay.")
-    else:
-        logger.error(
-            f"Investment type invalid input received - {message.text}")
-        bot.reply_to(message, "Invalid input.")
-
-
-def handle_investments_update(message, investment_type):
-    try:
-        if message.text.isnumeric():
-            if investment_type == constants.STOCKS:
-                response = requests.post(
-                    f'{api_constants.BASE_URL}{api_constants.UPDATE_INVESTMENT_ENDPOINT}', json={"stocks": message.text})
-            elif investment_type == constants.MUTUTAL_FUNDS:
-                response = requests.post(
-                    f'{api_constants.BASE_URL}{api_constants.UPDATE_INVESTMENT_ENDPOINT}', json={"mutual_funds": message.text})
-            elif investment_type == constants.CRYPTO:
-                response = requests.post(
-                    f'{api_constants.BASE_URL}{api_constants.UPDATE_INVESTMENT_ENDPOINT}', json={"crypto": message.text})
-        else:
-            logger.error(
-                f"Invalid investment amount - {message.text}")
-            bot.reply_to(message, "Invalid amount.")
-    except requests.exceptions.ConnectionError:
-        bot.send_message(
-            message.chat.id, 'An unexpected error occured.', reply_markup=types.ReplyKeyboardRemove())
-        return
-
-    # Check for successful response
-    if response.status_code in [200, 201]:
-        # Log the appropriate message
-        logger.info("Investment created successfully." if response.status_code == 201 else "Investment updated successfully.")
-        # Send a success message to the bot
-        success_message = 'Investment updated successfully.'
-    else:
-        # Send a server error message to the bot in case of failure
-        logger.error(
-            f"Create or update investment API server error for innvestment type - {investment_type}")
-        success_message = 'Server error.'
-
-    # Send the message with a ReplyKeyboardRemove to clear any previous keyboards
-    bot.send_message(message.chat.id, success_message,
-                     reply_markup=types.ReplyKeyboardRemove())
-
 
 def handle_quick_options(message):
     if (message.text == f'{constants.MARK_WORKOUT}'):

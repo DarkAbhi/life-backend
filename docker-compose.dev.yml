@@ -1,0 +1,72 @@
+services:
+  backend-dev:
+    image: golang:1.25.1-bookworm
+    user: "0:0"
+    entrypoint: []
+    working_dir: /app
+    container_name: life-api-dev
+    command: >
+      sh -lc '
+        apt-get update -y &&
+        apt-get install -y curl git &&
+        /usr/local/go/bin/go version &&
+        if [ ! -x /go/bin/air ]; then GOBIN=/go/bin /usr/local/go/bin/go install github.com/air-verse/air@v1.61.5; fi &&
+        /go/bin/air -c .air.toml
+      '
+    volumes:
+      - ./go-backend:/app
+      - go_build_cache:/go/pkg/mod
+      - go_tools:/go/bin
+    environment:
+      APP_ENV: development
+      PORT: 8080
+      DB_HOSTNAME: ${DB_HOSTNAME}
+      DB_PORT: ${DB_PORT:-6543}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_SSLMODE: ${DB_SSLMODE:-require}
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+    ports:
+      - "8080:8080"
+
+  web-dev:
+    image: node:24-bookworm-slim
+    working_dir: /app
+    container_name: life-web-dev
+    command: sh -lc "npm ci || npm i && npm run dev"
+    volumes:
+      - ./life-tracker-frontend:/app
+      - web_node_modules:/app/node_modules
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend-dev
+
+  bot-dev:
+    build:
+      context: ./telegram-bot
+      dockerfile: Dockerfile
+    container_name: life-bot-dev
+    environment:
+      BOT_API_KEY: ${BOT_API_KEY}
+      BACKEND_BASE_URL: http://backend-dev:8080
+    volumes:
+      - ./telegram-bot:/app
+      - bot_venv:/usr/local/lib/python3.12
+    command: sh -lc "python -m pip install --no-cache-dir -r requirements.txt watchfiles && python -m watchfiles --filter python 'python -u main.py' /app"
+    depends_on:
+      - backend-dev
+    restart: unless-stopped
+
+volumes:
+  go_build_cache:
+  web_node_modules:
+  bot_venv:
+  go_tools:
