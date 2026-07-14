@@ -7,7 +7,7 @@ services:
     container_name: life-migrate
     environment:
       DB_HOSTNAME: ${DB_HOSTNAME}
-      DB_PORT: ${DB_PORT:-6543}
+      DB_PORT: ${DB_PORT:-5432}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
