@@ -11,6 +11,22 @@ type Vehicle = {
   name: string;
 };
 
+type AirFill = {
+  vehicle_id: number;
+  filled_at: string;
+};
+type FuelItem = { fuelType: string; fillType: string; quantity: string; unitPrice: string; totalCost: string };
+const newFuelItem = (): FuelItem => ({ fuelType: "petrol", fillType: "full", quantity: "", unitPrice: "", totalCost: "" });
+const localDateTime = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+
+const airFillFormatter = new Intl.DateTimeFormat("en-IN", {
+  day: "numeric",
+  month: "short",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "Asia/Kolkata",
+});
+
 export default function Garage() {
   const router = useRouter();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -19,6 +35,18 @@ export default function Garage() {
   const [vehicleName, setVehicleName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
+  const [latestAirFills, setLatestAirFills] = useState<Record<number, string>>({});
+  const [pendingAirFillVehicle, setPendingAirFillVehicle] = useState<Vehicle | null>(null);
+  const [isMarkingAirFill, setIsMarkingAirFill] = useState(false);
+  const [airFillError, setAirFillError] = useState("");
+  const [fuelVehicle, setFuelVehicle] = useState<Vehicle | null>(null);
+  const [fuelOdometer, setFuelOdometer] = useState("");
+  const [fuelDateTime, setFuelDateTime] = useState(localDateTime());
+  const [stationName, setStationName] = useState("");
+  const [fuelNotes, setFuelNotes] = useState("");
+  const [fuelItems, setFuelItems] = useState<FuelItem[]>([newFuelItem()]);
+  const [isSavingFuel, setIsSavingFuel] = useState(false);
+  const [fuelError, setFuelError] = useState("");
 
   useEffect(() => {
     async function loadGarage() {
@@ -39,6 +67,16 @@ export default function Garage() {
           return;
         }
         setVehicles((await vehiclesResponse.json()) as Vehicle[]);
+
+        const airFillsResponse = await fetch(`${apiBaseURL}/api/vehicle-air-fills/latest`, {
+          credentials: "include",
+        });
+        if (!airFillsResponse.ok) {
+          setError("We couldn't load your vehicle maintenance status. Please try again.");
+          return;
+        }
+        const airFills = (await airFillsResponse.json()) as AirFill[];
+        setLatestAirFills(Object.fromEntries(airFills.map((fill) => [fill.vehicle_id, fill.filled_at])));
       } catch {
         setError("We couldn't reach the server. Please try again.");
       } finally {
@@ -73,6 +111,45 @@ export default function Garage() {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  async function markAirFill() {
+    if (!pendingAirFillVehicle) return;
+    setAirFillError("");
+    setIsMarkingAirFill(true);
+    try {
+      const response = await fetch(`${apiBaseURL}/api/vehicles/${pendingAirFillVehicle.id}/air-fills`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const body = (await response.json()) as { filled_at?: string; error?: string };
+      if (!response.ok || !body.filled_at) {
+        setAirFillError(body.error ?? "We couldn't record the air fill. Please try again.");
+        return;
+      }
+      setLatestAirFills((current) => ({ ...current, [pendingAirFillVehicle.id]: body.filled_at! }));
+      setPendingAirFillVehicle(null);
+    } catch {
+      setAirFillError("We couldn't reach the server. Please try again.");
+    } finally {
+      setIsMarkingAirFill(false);
+    }
+  }
+
+  async function saveFuel(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!fuelVehicle) return;
+    setFuelError(""); setIsSavingFuel(true);
+    const numberOrNull = (value: string) => value === "" ? null : Number(value);
+    try {
+      const response = await fetch(`${apiBaseURL}/api/vehicles/${fuelVehicle.id}/fuel-fillups`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ odometer_km: Number(fuelOdometer), filled_at: new Date(fuelDateTime).toISOString(), station_name: stationName || null, notes: fuelNotes || null, items: fuelItems.map((item) => ({ fuel_type: item.fuelType, fill_type: item.fillType, quantity: numberOrNull(item.quantity), unit_price: numberOrNull(item.unitPrice), total_cost: numberOrNull(item.totalCost) })) }),
+      });
+      const body = (await response.json()) as { error?: string };
+      if (!response.ok) { setFuelError(body.error ?? "We couldn't save this fuel entry."); return; }
+      setFuelVehicle(null); setFuelOdometer(""); setFuelDateTime(localDateTime()); setStationName(""); setFuelNotes(""); setFuelItems([newFuelItem()]);
+    } catch { setFuelError("We couldn't reach the server. Please try again."); } finally { setIsSavingFuel(false); }
   }
 
   return (
@@ -111,10 +188,33 @@ export default function Garage() {
         ) : (
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Vehicles">
             {vehicles.map((vehicle) => (
-              <article className="rounded-2xl border border-amber-100 bg-white p-6 shadow-sm" key={vehicle.id}>
+              <article className="cursor-pointer rounded-2xl border border-amber-100 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md" key={vehicle.id} onClick={() => router.push(`/garage/${vehicle.id}`)}>
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-lg" aria-hidden="true">🚗</div>
                 <h2 className="mt-4 text-lg font-semibold text-stone-900">{vehicle.name}</h2>
                 <p className="mt-1 text-sm text-stone-500">Vehicle #{vehicle.id}</p>
+                <p className="mt-4 text-sm text-stone-600">
+                  {latestAirFills[vehicle.id]
+                    ? `Air last filled ${airFillFormatter.format(new Date(latestAirFills[vehicle.id]))}`
+                    : "No air fill recorded yet."}
+                </p>
+                <button
+                  className="mt-4 w-full rounded-lg border border-amber-200 px-4 py-3 text-sm font-semibold text-amber-900 transition hover:bg-amber-50"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setAirFillError("");
+                    setPendingAirFillVehicle(vehicle);
+                  }}
+                  type="button"
+                >
+                  Mark air filled now
+                </button>
+                <button
+                  className="mt-3 w-full rounded-lg bg-stone-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-stone-900"
+                  onClick={(event) => { event.stopPropagation(); setFuelError(""); setFuelVehicle(vehicle); }}
+                  type="button"
+                >
+                  Add fuel
+                </button>
               </article>
             ))}
           </section>
@@ -156,6 +256,66 @@ export default function Garage() {
                   {isSaving ? "Adding…" : "Add vehicle"}
                 </button>
               </div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {pendingAirFillVehicle && (
+        <div className="fixed inset-0 z-10 flex items-center justify-center bg-stone-950/40 px-6" role="dialog" aria-labelledby="air-fill-title" aria-modal="true">
+          <section className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
+            <h2 className="text-2xl font-bold tracking-tight text-stone-900" id="air-fill-title">Mark air filled?</h2>
+            <p className="mt-2 text-sm leading-6 text-stone-600">
+              Record that you filled air in {pendingAirFillVehicle.name} right now. We&apos;ll remind you again in 30 days.
+            </p>
+            {airFillError && <p className="mt-3 text-sm text-red-600" role="alert">{airFillError}</p>}
+            <div className="mt-6 flex gap-3">
+              <button
+                className="flex-1 rounded-lg border border-stone-300 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+                disabled={isMarkingAirFill}
+                onClick={() => setPendingAirFillVehicle(null)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="flex-1 rounded-lg bg-amber-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-amber-300"
+                disabled={isMarkingAirFill}
+                onClick={() => void markAirFill()}
+                type="button"
+              >
+                {isMarkingAirFill ? "Marking…" : "Yes, mark air filled"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {fuelVehicle && (
+        <div className="fixed inset-0 z-10 overflow-y-auto bg-stone-950/40 px-6 py-8" role="dialog" aria-labelledby="fuel-title" aria-modal="true">
+          <section className="mx-auto w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
+            <h2 className="text-2xl font-bold tracking-tight text-stone-900" id="fuel-title">Add fuel for {fuelVehicle.name}</h2>
+            <p className="mt-2 text-sm text-stone-600">Enter any two fuel-cost values; the third is calculated automatically when saved.</p>
+            <form className="mt-6 space-y-5" onSubmit={saveFuel}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="text-sm font-medium text-stone-700">Odometer (km)<input className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2" min="0" onChange={(e) => setFuelOdometer(e.target.value)} required step="0.1" type="number" value={fuelOdometer} /></label>
+                <label className="text-sm font-medium text-stone-700">Date & time<input className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2" onChange={(e) => setFuelDateTime(e.target.value)} required type="datetime-local" value={fuelDateTime} /></label>
+                <label className="text-sm font-medium text-stone-700">Station / vendor<input className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2" onChange={(e) => setStationName(e.target.value)} placeholder="Optional" value={stationName} /></label>
+                <label className="text-sm font-medium text-stone-700">Notes<input className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2" onChange={(e) => setFuelNotes(e.target.value)} placeholder="Optional" value={fuelNotes} /></label>
+              </div>
+              {fuelItems.map((item, index) => (
+                <fieldset className="rounded-xl border border-amber-100 p-4" key={index}>
+                  <legend className="px-1 text-sm font-semibold text-stone-800">{fuelItems.length > 1 ? `Tank ${index + 1}` : "Fuel details"}</legend>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="text-sm">Fuel type<select className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2" onChange={(e) => setFuelItems((items) => items.map((current, i) => i === index ? { ...current, fuelType: e.target.value } : current))} value={item.fuelType}><option value="petrol">Petrol</option><option value="diesel">Diesel</option><option value="lpg">LPG</option><option value="cng">CNG</option><option value="electric">Electric</option></select></label>
+                    <label className="text-sm">Fill type<select className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2" onChange={(e) => setFuelItems((items) => items.map((current, i) => i === index ? { ...current, fillType: e.target.value } : current))} value={item.fillType}><option value="full">Full tank</option><option value="partial">Partial fill-up</option><option value="missed">Missed fill-up</option></select></label>
+                    {([['quantity','Quantity (L)'],['unitPrice','Price per litre'],['totalCost','Total cost']] as const).map(([field,label]) => <label className="text-sm" key={field}>{label}<input className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2" min="0" onChange={(e) => setFuelItems((items) => items.map((current, i) => i === index ? { ...current, [field]: e.target.value } : current))} step="0.01" type="number" value={item[field]} /></label>)}
+                  </div>
+                </fieldset>
+              ))}
+              {fuelItems.length < 2 && <button className="text-sm font-semibold text-amber-800" onClick={() => setFuelItems((items) => [...items, newFuelItem()])} type="button">+ Add second fuel tank</button>}
+              {fuelError && <p className="text-sm text-red-600" role="alert">{fuelError}</p>}
+              <div className="flex gap-3"><button className="flex-1 rounded-lg border border-stone-300 px-4 py-3 text-sm font-semibold" disabled={isSavingFuel} onClick={() => setFuelVehicle(null)} type="button">Cancel</button><button className="flex-1 rounded-lg bg-stone-800 px-4 py-3 text-sm font-semibold text-white disabled:bg-stone-300" disabled={isSavingFuel} type="submit">{isSavingFuel ? "Saving…" : "Save fuel entry"}</button></div>
             </form>
           </section>
         </div>

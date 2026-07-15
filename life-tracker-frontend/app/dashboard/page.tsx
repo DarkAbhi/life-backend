@@ -3,6 +3,7 @@
 import { SubmitEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AppNotification, NotificationList } from "../components/notification-list";
 
 const apiBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
@@ -27,6 +28,9 @@ export default function Dashboard() {
   const [isMarkingGym, setIsMarkingGym] = useState(false);
   const [gymError, setGymError] = useState("");
   const [isConfirmingAnotherVisit, setIsConfirmingAnotherVisit] = useState(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [isNotificationsLoading, setIsNotificationsLoading] = useState(true);
+  const [notificationsError, setNotificationsError] = useState("");
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -87,6 +91,27 @@ export default function Dashboard() {
     void loadDashboard();
   }, [router]);
 
+  useEffect(() => {
+    async function loadNotifications() {
+      try {
+        const response = await fetch(`${apiBaseURL}/api/notifications?limit=5`, {
+          credentials: "include",
+        });
+        if (!response.ok) {
+          setNotificationsError("We couldn't load your notifications.");
+          return;
+        }
+        setNotifications((await response.json()) as AppNotification[]);
+      } catch {
+        setNotificationsError("We couldn't reach the notification center.");
+      } finally {
+        setIsNotificationsLoading(false);
+      }
+    }
+
+    void loadNotifications();
+  }, []);
+
   async function saveName(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -134,6 +159,18 @@ export default function Dashboard() {
     } finally {
       setIsMarkingGym(false);
     }
+  }
+
+  async function dismissNotification(notificationID: number) {
+    const response = await fetch(`${apiBaseURL}/api/notifications/${notificationID}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      setNotificationsError("We couldn't dismiss that notification. Please try again.");
+      return;
+    }
+    setNotifications((current) => current.filter((notification) => notification.id !== notificationID));
   }
 
   if (isLoading || !username) {
@@ -219,6 +256,30 @@ export default function Dashboard() {
               )}
             </article>
           </div>
+        </section>
+
+        <section className="mt-12" aria-labelledby="notifications-heading">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-stone-800" id="notifications-heading">Notification center</h2>
+              <p className="mt-1 text-sm text-stone-500">Recent updates from your spaces.</p>
+            </div>
+            <Link className="shrink-0 text-sm font-semibold text-amber-800 transition hover:text-amber-950" href="/notifications">
+              View all →
+            </Link>
+          </div>
+          {isNotificationsLoading ? (
+            <p className="text-sm text-stone-600">Checking for updates…</p>
+          ) : notificationsError ? (
+            <p className="rounded-xl bg-red-50 p-4 text-sm text-red-700" role="alert">{notificationsError}</p>
+          ) : notifications.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-amber-200 bg-white/70 p-7 text-center">
+              <p className="font-semibold text-stone-800">You&apos;re all caught up.</p>
+              <p className="mt-1 text-sm text-stone-600">Updates from your spaces will appear here.</p>
+            </div>
+          ) : (
+            <NotificationList notifications={notifications} onDismiss={dismissNotification} />
+          )}
         </section>
       </div>
 

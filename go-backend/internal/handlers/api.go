@@ -30,6 +30,9 @@ func (a *API) Router() http.Handler {
 		api.Get("/auth/session", a.Session)
 		api.Get("/profile", a.GetProfile)
 		api.Put("/profile", a.SaveProfile)
+		api.Get("/notifications", a.ListNotifications)
+		api.Delete("/notifications", a.ClearNotifications)
+		api.Delete("/notifications/{id}", a.DismissNotification)
 		// Daily logs
 		api.Get("/workout/today", a.GymVisitedToday)
 		api.Post("/workout/today", a.AddWorkoutForDay)
@@ -49,12 +52,16 @@ func (a *API) Router() http.Handler {
 		// Vehicles
 		api.Get("/vehicles", a.ListVehicles)
 		api.Post("/vehicles", a.CreateVehicle) // create
+		api.Get("/vehicle-air-fills/latest", a.ListLatestVehicleAirFills)
 
 		api.Route("/vehicles/{id}", func(v chi.Router) {
 			v.Get("/", a.GetVehicle)       // retrieve by id
 			v.Put("/", a.UpdateVehicle)    // full/partial update
 			v.Patch("/", a.UpdateVehicle)  // alias to update
 			v.Delete("/", a.DeleteVehicle) // delete
+			v.Post("/air-fills", a.CreateVehicleAirFill)
+			v.Post("/fuel-fillups", a.CreateFuelFillup)
+			v.Get("/history", a.VehicleHistory)
 		})
 	})
 
