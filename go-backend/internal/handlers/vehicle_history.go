@@ -4,7 +4,10 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type airFillHistory struct {
@@ -41,13 +44,13 @@ func (a *API) VehicleHistory(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var exists bool
-	if err := a.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM vehicles WHERE id=$1)`, vehicleID).Scan(&exists); err != nil {
+	var vehicleName string
+	if err := a.DB.QueryRow(`SELECT name FROM vehicles WHERE id=$1`, vehicleID).Scan(&vehicleName); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
 		serverError(w, err)
-		return
-	}
-	if !exists {
-		http.NotFound(w, r)
 		return
 	}
 	airRows, err := a.DB.Query(`SELECT id,filled_at FROM vehicle_air_fills WHERE vehicle_id=$1 AND user_id=$2 ORDER BY filled_at DESC,id DESC`, vehicleID, user.ID)
@@ -96,5 +99,47 @@ func (a *API) VehicleHistory(w http.ResponseWriter, r *http.Request) {
 		rows.Close()
 		fuels = append(fuels, fill)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"air_fills": air, "fuel_fillups": fuels})
+	writeJSON(w, http.StatusOK, map[string]any{"vehicle_name": vehicleName, "air_fills": air, "fuel_fillups": fuels})
+}
+
+func (a *API) DeleteVehicleAirFill(w http.ResponseWriter, r *http.Request) {
+	a.deleteVehicleRecord(w, r, "vehicle_air_fills", "airFillID")
+}
+func (a *API) DeleteFuelFillup(w http.ResponseWriter, r *http.Request) {
+	a.deleteVehicleRecord(w, r, "vehicle_fuel_fillups", "fillupID")
+}
+func (a *API) deleteVehicleRecord(w http.ResponseWriter, r *http.Request, table, param string) {
+	user, err := a.sessionUser(r)
+	if errors.Is(err, sql.ErrNoRows) {
+		unauthorized(w, "session is invalid or expired")
+		return
+	}
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	vehicleID, ok := parseID(w, r)
+	if !ok {
+		return
+	}
+	recordID, err := strconv.ParseInt(chi.URLParam(r, param), 10, 64)
+	if err != nil || recordID <= 0 {
+		badRequest(w, "invalid record id")
+		return
+	}
+	result, err := a.DB.Exec(`DELETE FROM `+table+` WHERE id=$1 AND vehicle_id=$2 AND user_id=$3`, recordID, vehicleID, user.ID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if n == 0 {
+		http.NotFound(w, r)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

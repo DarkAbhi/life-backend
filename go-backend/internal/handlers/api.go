@@ -62,6 +62,8 @@ func (a *API) Router() http.Handler {
 			v.Post("/air-fills", a.CreateVehicleAirFill)
 			v.Post("/fuel-fillups", a.CreateFuelFillup)
 			v.Get("/history", a.VehicleHistory)
+			v.Delete("/air-fills/{airFillID}", a.DeleteVehicleAirFill)
+			v.Delete("/fuel-fillups/{fillupID}", a.DeleteFuelFillup)
 		})
 	})
 
