@@ -65,7 +65,7 @@ func createGymReminder(database *sql.DB, userID int64, reminderDate string) erro
 	var notificationID int64
 	err = tx.QueryRow(`
 		INSERT INTO notifications (user_id, source, title, body, target_path, priority, metadata)
-		SELECT $1, $2, 'Time for the gym', 'Your 3:30 PM gym reminder. Mark your visit when you are done.', '/gym-visits', 1, jsonb_build_object('reminder_date', $3)
+		SELECT $1, $2, 'Time for the gym', 'Your 3:30 PM gym reminder. Mark your visit when you are done.', '/gym-visits', 1, jsonb_build_object('reminder_date', $3::text)
 		WHERE NOT EXISTS (
 			SELECT 1 FROM gym_reminder_deliveries WHERE user_id = $1 AND reminder_date = $3::date
 		)
