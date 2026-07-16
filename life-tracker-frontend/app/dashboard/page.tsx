@@ -31,6 +31,11 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isNotificationsLoading, setIsNotificationsLoading] = useState(true);
   const [notificationsError, setNotificationsError] = useState("");
+  const [purchaseName, setPurchaseName] = useState("");
+  const [purchasePrice, setPurchasePrice] = useState("");
+  const [purchaseURL, setPurchaseURL] = useState("");
+  const [isSavingPurchase, setIsSavingPurchase] = useState(false);
+  const [purchaseError, setPurchaseError] = useState("");
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -173,6 +178,11 @@ export default function Dashboard() {
     setNotifications((current) => current.filter((notification) => notification.id !== notificationID));
   }
 
+  async function addNextMonthPurchase(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault(); setPurchaseError(""); setIsSavingPurchase(true);
+    try { const response=await fetch(`${apiBaseURL}/api/next-month-purchases`,{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:purchaseName,price:Number(purchasePrice),url:purchaseURL||null})}); const body=await response.json() as {error?:string}; if(!response.ok){setPurchaseError(body.error??"We couldn't save that item.");return};setPurchaseName("");setPurchasePrice("");setPurchaseURL("") } catch { setPurchaseError("We couldn't reach the server.") } finally { setIsSavingPurchase(false) }
+  }
+
   if (isLoading || !username) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-600">
@@ -280,6 +290,20 @@ export default function Dashboard() {
           ) : (
             <NotificationList notifications={notifications} onDismiss={dismissNotification} />
           )}
+        </section>
+
+        <section className="mt-12 max-w-xl rounded-2xl border border-sky-100 bg-white p-6 shadow-sm" aria-labelledby="next-month-heading">
+          <div className="flex items-start justify-between gap-4">
+            <div><h2 className="text-lg font-semibold text-stone-800" id="next-month-heading">Next month purchases</h2><p className="mt-1 text-sm text-stone-500">A small place for the things you&apos;ll need soon.</p></div>
+            <Link className="shrink-0 text-sm font-semibold text-sky-800" href="/next-month">View all →</Link>
+          </div>
+          <form className="mt-5 grid gap-3 sm:grid-cols-2" onSubmit={addNextMonthPurchase}>
+            <input className="rounded-lg border border-stone-300 px-3 py-2 text-sm" onChange={(e)=>setPurchaseName(e.target.value)} placeholder="Item name" required value={purchaseName}/>
+            <input className="rounded-lg border border-stone-300 px-3 py-2 text-sm" min="0" onChange={(e)=>setPurchasePrice(e.target.value)} placeholder="Price" required step="0.01" type="number" value={purchasePrice}/>
+            <input className="sm:col-span-2 rounded-lg border border-stone-300 px-3 py-2 text-sm" onChange={(e)=>setPurchaseURL(e.target.value)} placeholder="Optional URL" type="url" value={purchaseURL}/>
+            {purchaseError&&<p className="sm:col-span-2 text-sm text-red-600" role="alert">{purchaseError}</p>}
+            <button className="sm:col-span-2 rounded-lg bg-sky-700 px-4 py-3 text-sm font-semibold text-white disabled:bg-sky-300" disabled={isSavingPurchase} type="submit">{isSavingPurchase?"Adding…":"Add for next month"}</button>
+          </form>
         </section>
       </div>
 

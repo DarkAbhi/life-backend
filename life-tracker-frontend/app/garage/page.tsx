@@ -191,7 +191,6 @@ export default function Garage() {
               <article className="cursor-pointer rounded-2xl border border-amber-100 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md" key={vehicle.id} onClick={() => router.push(`/garage/${vehicle.id}`)}>
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-lg" aria-hidden="true">🚗</div>
                 <h2 className="mt-4 text-lg font-semibold text-stone-900">{vehicle.name}</h2>
-                <p className="mt-1 text-sm text-stone-500">Vehicle #{vehicle.id}</p>
                 <p className="mt-4 text-sm text-stone-600">
                   {latestAirFills[vehicle.id]
                     ? `Air last filled ${airFillFormatter.format(new Date(latestAirFills[vehicle.id]))}`
