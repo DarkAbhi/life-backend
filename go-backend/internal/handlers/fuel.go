@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type fuelItemInput struct {
@@ -92,6 +95,79 @@ func (a *API) CreateFuelFillup(w http.ResponseWriter, r *http.Request) {
 		economies[item.FuelType] = a.latestFuelEconomy(vehicleID, item.FuelType)
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"id": fillupID, "economy_km_per_litre": economies})
+}
+
+func (a *API) UpdateFuelFillup(w http.ResponseWriter, r *http.Request) {
+	user, err := a.sessionUser(r)
+	if errors.Is(err, sql.ErrNoRows) {
+		unauthorized(w, "session is invalid or expired")
+		return
+	}
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	vehicleID, ok := parseID(w, r)
+	if !ok {
+		return
+	}
+	fillupID, err := strconv.ParseInt(chi.URLParam(r, "fillupID"), 10, 64)
+	if err != nil || fillupID <= 0 {
+		badRequest(w, "invalid fuel fill-up id")
+		return
+	}
+	var in fuelFillupInput
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&in); err != nil {
+		badRequest(w, "invalid JSON")
+		return
+	}
+	if in.OdometerKM < 0 || len(in.Items) == 0 || len(in.Items) > 2 {
+		badRequest(w, "odometer and one or two fuel tanks are required")
+		return
+	}
+	for i := range in.Items {
+		if err := normalizeFuelItem(&in.Items[i]); err != nil {
+			badRequest(w, err.Error())
+			return
+		}
+	}
+	filledAt := time.Now()
+	if in.FilledAt != nil {
+		filledAt = *in.FilledAt
+	}
+	tx, err := a.DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	defer tx.Rollback()
+	var found int
+	if err := tx.QueryRow(`SELECT 1 FROM vehicle_fuel_fillups WHERE id=$1 AND vehicle_id=$2 AND user_id=$3 FOR UPDATE`, fillupID, vehicleID, user.ID).Scan(&found); errors.Is(err, sql.ErrNoRows) {
+		http.NotFound(w, r)
+		return
+	} else if err != nil {
+		serverError(w, err)
+		return
+	}
+	if _, err := tx.Exec(`UPDATE vehicle_fuel_fillups SET odometer_km=$1,filled_at=$2,station_name=$3,notes=$4 WHERE id=$5`, in.OdometerKM, filledAt, in.StationName, in.Notes, fillupID); err != nil {
+		serverError(w, err)
+		return
+	}
+	if _, err := tx.Exec(`DELETE FROM vehicle_fuel_items WHERE fillup_id=$1`, fillupID); err != nil {
+		serverError(w, err)
+		return
+	}
+	for _, item := range in.Items {
+		if _, err := tx.Exec(`INSERT INTO vehicle_fuel_items (fillup_id,fuel_type,fill_type,quantity,unit_price,total_cost) VALUES ($1,$2,$3,$4,$5,$6)`, fillupID, item.FuelType, item.FillType, *item.Quantity, *item.UnitPrice, *item.TotalCost); err != nil {
+			serverError(w, err)
+			return
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		serverError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"id": fillupID})
 }
 
 func normalizeFuelItem(item *fuelItemInput) error {

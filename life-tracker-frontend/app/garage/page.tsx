@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { SubmitEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { FuelForm, FuelFormItem } from "../components/fuel-form";
 
 const apiBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
@@ -15,7 +16,7 @@ type AirFill = {
   vehicle_id: number;
   filled_at: string;
 };
-type FuelItem = { fuelType: string; fillType: string; quantity: string; unitPrice: string; totalCost: string };
+type FuelItem = FuelFormItem;
 const newFuelItem = (): FuelItem => ({ fuelType: "petrol", fillType: "full", quantity: "", unitPrice: "", totalCost: "" });
 const localDateTime = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 
@@ -295,27 +296,24 @@ export default function Garage() {
           <section className="mx-auto w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
             <h2 className="text-2xl font-bold tracking-tight text-stone-900" id="fuel-title">Add fuel for {fuelVehicle.name}</h2>
             <p className="mt-2 text-sm text-stone-600">Enter any two fuel-cost values; the third is calculated automatically when saved.</p>
-            <form className="mt-6 space-y-5" onSubmit={saveFuel}>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="text-sm font-medium text-stone-700">Odometer (km)<input className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2" min="0" onChange={(e) => setFuelOdometer(e.target.value)} required step="0.1" type="number" value={fuelOdometer} /></label>
-                <label className="text-sm font-medium text-stone-700">Date & time<input className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2" onChange={(e) => setFuelDateTime(e.target.value)} required type="datetime-local" value={fuelDateTime} /></label>
-                <label className="text-sm font-medium text-stone-700">Station / vendor<input className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2" onChange={(e) => setStationName(e.target.value)} placeholder="Optional" value={stationName} /></label>
-                <label className="text-sm font-medium text-stone-700">Notes<input className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2" onChange={(e) => setFuelNotes(e.target.value)} placeholder="Optional" value={fuelNotes} /></label>
-              </div>
-              {fuelItems.map((item, index) => (
-                <fieldset className="rounded-xl border border-amber-100 p-4" key={index}>
-                  <legend className="px-1 text-sm font-semibold text-stone-800">{fuelItems.length > 1 ? `Tank ${index + 1}` : "Fuel details"}</legend>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="text-sm">Fuel type<select className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2" onChange={(e) => setFuelItems((items) => items.map((current, i) => i === index ? { ...current, fuelType: e.target.value } : current))} value={item.fuelType}><option value="petrol">Petrol</option><option value="diesel">Diesel</option><option value="lpg">LPG</option><option value="cng">CNG</option><option value="electric">Electric</option></select></label>
-                    <label className="text-sm">Fill type<select className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2" onChange={(e) => setFuelItems((items) => items.map((current, i) => i === index ? { ...current, fillType: e.target.value } : current))} value={item.fillType}><option value="full">Full tank</option><option value="partial">Partial fill-up</option><option value="missed">Missed fill-up</option></select></label>
-                    {([['quantity','Quantity (L)'],['unitPrice','Price per litre'],['totalCost','Total cost']] as const).map(([field,label]) => <label className="text-sm" key={field}>{label}<input className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2" min="0" onChange={(e) => setFuelItems((items) => items.map((current, i) => i === index ? { ...current, [field]: e.target.value } : current))} step="0.01" type="number" value={item[field]} /></label>)}
-                  </div>
-                </fieldset>
-              ))}
-              {fuelItems.length < 2 && <button className="text-sm font-semibold text-amber-800" onClick={() => setFuelItems((items) => [...items, newFuelItem()])} type="button">+ Add second fuel tank</button>}
-              {fuelError && <p className="text-sm text-red-600" role="alert">{fuelError}</p>}
-              <div className="flex gap-3"><button className="flex-1 rounded-lg border border-stone-300 px-4 py-3 text-sm font-semibold" disabled={isSavingFuel} onClick={() => setFuelVehicle(null)} type="button">Cancel</button><button className="flex-1 rounded-lg bg-stone-800 px-4 py-3 text-sm font-semibold text-white disabled:bg-stone-300" disabled={isSavingFuel} type="submit">{isSavingFuel ? "Saving…" : "Save fuel entry"}</button></div>
-            </form>
+            <FuelForm
+              error={fuelError}
+              filledAt={fuelDateTime}
+              isSaving={isSavingFuel}
+              items={fuelItems}
+              notes={fuelNotes}
+              odometer={fuelOdometer}
+              onCancel={() => setFuelVehicle(null)}
+              onFilledAtChange={setFuelDateTime}
+              onItemsChange={setFuelItems}
+              onNotesChange={setFuelNotes}
+              onOdometerChange={setFuelOdometer}
+              onStationNameChange={setStationName}
+              onSubmit={saveFuel}
+              savingLabel="Saving…"
+              stationName={stationName}
+              submitLabel="Save fuel entry"
+            />
           </section>
         </div>
       )}
