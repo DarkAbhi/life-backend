@@ -33,6 +33,7 @@ func (a *API) Router() http.Handler {
 		api.Get("/notifications", a.ListNotifications)
 		api.Delete("/notifications", a.ClearNotifications)
 		api.Delete("/notifications/{id}", a.DismissNotification)
+		api.Post("/notifications/{id}/gym-visit", a.MarkGymReminderVisited)
 		api.Get("/next-month-purchases", a.NextMonthPurchases)
 		api.Post("/next-month-purchases", a.CreateNextMonthPurchase)
 		// Daily logs

@@ -178,6 +178,21 @@ export default function Dashboard() {
     setNotifications((current) => current.filter((notification) => notification.id !== notificationID));
   }
 
+  async function markGymReminderVisited(notificationID: number) {
+    const response = await fetch(`${apiBaseURL}/api/notifications/${notificationID}/gym-visit`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      setNotificationsError("We couldn't save that gym visit. Please try again.");
+      return;
+    }
+    const body = (await response.json()) as { id: number };
+    setGymVisited(true);
+    setGymVisitID(body.id);
+    setNotifications((current) => current.filter((notification) => notification.id !== notificationID));
+  }
+
   async function addNextMonthPurchase(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault(); setPurchaseError(""); setIsSavingPurchase(true);
     try { const response=await fetch(`${apiBaseURL}/api/next-month-purchases`,{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:purchaseName,price:Number(purchasePrice),url:purchaseURL||null})}); const body=await response.json() as {error?:string}; if(!response.ok){setPurchaseError(body.error??"We couldn't save that item.");return};setPurchaseName("");setPurchasePrice("");setPurchaseURL("") } catch { setPurchaseError("We couldn't reach the server.") } finally { setIsSavingPurchase(false) }
@@ -288,7 +303,7 @@ export default function Dashboard() {
               <p className="mt-1 text-sm text-stone-600">Updates from your spaces will appear here.</p>
             </div>
           ) : (
-            <NotificationList notifications={notifications} onDismiss={dismissNotification} />
+            <NotificationList notifications={notifications} onDismiss={dismissNotification} onMarkGymVisited={markGymReminderVisited} />
           )}
         </section>
 

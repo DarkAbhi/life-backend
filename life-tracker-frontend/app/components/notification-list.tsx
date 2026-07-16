@@ -15,6 +15,7 @@ export type AppNotification = {
 type NotificationListProps = {
   notifications: AppNotification[];
   onDismiss: (notificationID: number) => Promise<void>;
+  onMarkGymVisited?: (notificationID: number) => Promise<void>;
 };
 
 const timeFormatter = new Intl.DateTimeFormat("en-IN", {
@@ -25,20 +26,22 @@ const timeFormatter = new Intl.DateTimeFormat("en-IN", {
   timeZone: "Asia/Kolkata",
 });
 
-export function NotificationList({ notifications, onDismiss }: NotificationListProps) {
+export function NotificationList({ notifications, onDismiss, onMarkGymVisited }: NotificationListProps) {
   return (
     <div className="space-y-3">
       {notifications.map((notification) => (
-        <NotificationCard key={notification.id} notification={notification} onDismiss={onDismiss} />
+        <NotificationCard key={notification.id} notification={notification} onDismiss={onDismiss} onMarkGymVisited={onMarkGymVisited} />
       ))}
     </div>
   );
 }
 
-function NotificationCard({ notification, onDismiss }: { notification: AppNotification; onDismiss: (notificationID: number) => Promise<void> }) {
+function NotificationCard({ notification, onDismiss, onMarkGymVisited }: { notification: AppNotification; onDismiss: (notificationID: number) => Promise<void>; onMarkGymVisited?: (notificationID: number) => Promise<void> }) {
   const startX = useRef<number | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
   const [isDismissing, setIsDismissing] = useState(false);
+  const [isMarkingGymVisited, setIsMarkingGymVisited] = useState(false);
+  const isGymReminder = notification.source === "Gym reminder";
 
   async function dismiss() {
     setIsDismissing(true);
@@ -47,6 +50,16 @@ function NotificationCard({ notification, onDismiss }: { notification: AppNotifi
     } finally {
       setIsDismissing(false);
       setDragOffset(0);
+    }
+  }
+
+  async function markGymVisited() {
+    if (!onMarkGymVisited) return;
+    setIsMarkingGymVisited(true);
+    try {
+      await onMarkGymVisited(notification.id);
+    } finally {
+      setIsMarkingGymVisited(false);
     }
   }
 
@@ -95,6 +108,16 @@ function NotificationCard({ notification, onDismiss }: { notification: AppNotifi
           </button>
         </div>
         {notification.body && <p className="mt-2 text-sm leading-6 text-stone-600">{notification.body}</p>}
+        {isGymReminder && onMarkGymVisited && (
+          <button
+            className="mt-4 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-300"
+            disabled={isMarkingGymVisited || isDismissing}
+            onClick={() => void markGymVisited()}
+            type="button"
+          >
+            {isMarkingGymVisited ? "Saving your visit…" : "I visited the gym"}
+          </button>
+        )}
         <p className="mt-3 text-xs text-stone-400">{timeFormatter.format(new Date(notification.created_at))} · Swipe left to dismiss</p>
       </article>
     </div>

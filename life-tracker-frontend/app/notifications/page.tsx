@@ -50,6 +50,18 @@ export default function NotificationsPage() {
     setNotifications((current) => current.filter((notification) => notification.id !== notificationID));
   }
 
+  async function markGymVisited(notificationID: number) {
+    const response = await fetch(`${apiBaseURL}/api/notifications/${notificationID}/gym-visit`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      setError("We couldn't save that gym visit. Please try again.");
+      return;
+    }
+    setNotifications((current) => current.filter((notification) => notification.id !== notificationID));
+  }
+
   async function clearAll() {
     setError("");
     setIsClearing(true);
@@ -101,7 +113,7 @@ export default function NotificationsPage() {
               <p className="mt-2 text-sm text-stone-600">New updates from your life spaces will appear here.</p>
             </div>
           ) : (
-            <NotificationList notifications={notifications} onDismiss={dismissNotification} />
+            <NotificationList notifications={notifications} onDismiss={dismissNotification} onMarkGymVisited={markGymVisited} />
           )}
         </section>
       </div>

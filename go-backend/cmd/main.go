@@ -62,6 +62,7 @@ func main() {
 	// --- Normal server boot ---
 	d := db.ConnectDB()
 	go handlers.RunAirFillReminderJob(d)
+	go handlers.RunGymReminderJob(d)
 
 	port := os.Getenv("PORT")
 	if port == "" {
