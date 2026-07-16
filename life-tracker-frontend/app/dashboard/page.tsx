@@ -179,18 +179,23 @@ export default function Dashboard() {
   }
 
   async function markGymReminderVisited(notificationID: number) {
-    const response = await fetch(`${apiBaseURL}/api/notifications/${notificationID}/gym-visit`, {
-      method: "POST",
-      credentials: "include",
-    });
-    if (!response.ok) {
-      setNotificationsError("We couldn't save that gym visit. Please try again.");
-      return;
+    setNotificationsError("");
+    try {
+      const response = await fetch(`${apiBaseURL}/api/notifications/${notificationID}/gym-visit`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        setNotificationsError("We couldn't save that gym visit. Please try again.");
+        return;
+      }
+      const body = (await response.json()) as { id: number };
+      setGymVisited(true);
+      setGymVisitID(body.id);
+      setNotifications((current) => current.filter((notification) => notification.id !== notificationID));
+    } catch {
+      setNotificationsError("We couldn't reach the server. Please try again.");
     }
-    const body = (await response.json()) as { id: number };
-    setGymVisited(true);
-    setGymVisitID(body.id);
-    setNotifications((current) => current.filter((notification) => notification.id !== notificationID));
   }
 
   async function addNextMonthPurchase(event: SubmitEvent<HTMLFormElement>) {

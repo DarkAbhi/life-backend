@@ -51,15 +51,20 @@ export default function NotificationsPage() {
   }
 
   async function markGymVisited(notificationID: number) {
-    const response = await fetch(`${apiBaseURL}/api/notifications/${notificationID}/gym-visit`, {
-      method: "POST",
-      credentials: "include",
-    });
-    if (!response.ok) {
-      setError("We couldn't save that gym visit. Please try again.");
-      return;
+    setError("");
+    try {
+      const response = await fetch(`${apiBaseURL}/api/notifications/${notificationID}/gym-visit`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        setError("We couldn't save that gym visit. Please try again.");
+        return;
+      }
+      setNotifications((current) => current.filter((notification) => notification.id !== notificationID));
+    } catch {
+      setError("We couldn't reach the server. Please try again.");
     }
-    setNotifications((current) => current.filter((notification) => notification.id !== notificationID));
   }
 
   async function clearAll() {

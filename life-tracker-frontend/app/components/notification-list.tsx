@@ -112,7 +112,11 @@ function NotificationCard({ notification, onDismiss, onMarkGymVisited }: { notif
           <button
             className="mt-4 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-300"
             disabled={isMarkingGymVisited || isDismissing}
-            onClick={() => void markGymVisited()}
+            onClick={(event) => {
+              event.stopPropagation();
+              void markGymVisited();
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
             type="button"
           >
             {isMarkingGymVisited ? "Saving your visit…" : "I visited the gym"}
