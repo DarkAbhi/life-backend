@@ -30,6 +30,7 @@ func (a *API) ListGymVisits(w http.ResponseWriter, r *http.Request) {
 			serverError(w, err)
 			return
 		}
+		visit.CreatedAt = visit.CreatedAt.UTC()
 		visits = append(visits, visit)
 	}
 	if err := rows.Err(); err != nil {

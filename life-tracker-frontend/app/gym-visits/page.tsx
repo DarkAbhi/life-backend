@@ -13,13 +13,11 @@ type GymVisit = {
 
 const dateFormatter = new Intl.DateTimeFormat("en-IN", {
   dateStyle: "full",
-  timeZone: "Asia/Kolkata",
 });
 
 const timeFormatter = new Intl.DateTimeFormat("en-IN", {
   hour: "numeric",
   minute: "2-digit",
-  timeZone: "Asia/Kolkata",
 });
 
 export default function GymVisits() {

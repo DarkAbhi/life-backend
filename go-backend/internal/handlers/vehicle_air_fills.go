@@ -47,7 +47,7 @@ func (a *API) CreateVehicleAirFill(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, vehicleAirFillDTO{VehicleID: vehicleID, FilledAt: filledAt})
+	writeJSON(w, http.StatusCreated, vehicleAirFillDTO{VehicleID: vehicleID, FilledAt: filledAt.UTC()})
 }
 
 func (a *API) ListLatestVehicleAirFills(w http.ResponseWriter, r *http.Request) {
@@ -80,6 +80,7 @@ func (a *API) ListLatestVehicleAirFills(w http.ResponseWriter, r *http.Request) 
 			serverError(w, err)
 			return
 		}
+		fill.FilledAt = fill.FilledAt.UTC()
 		fills = append(fills, fill)
 	}
 	if err := rows.Err(); err != nil {

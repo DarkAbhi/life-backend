@@ -14,7 +14,7 @@ import (
 // POST /api/workout/today
 // --------------------------
 func (a *API) GymVisitedToday(w http.ResponseWriter, r *http.Request) {
-	start, end := dayBoundsIndia(time.Now())
+	start, end := dayBoundsIndia(time.Now().UTC())
 	const q = `
 		SELECT id FROM gym_visits
 		WHERE created_at >= $1 AND created_at < $2
@@ -47,7 +47,7 @@ func (a *API) AddWorkoutForDay(w http.ResponseWriter, r *http.Request) {
 // POST /api/meditation/today
 // ------------------------------
 func (a *API) AddMeditationForDay(w http.ResponseWriter, r *http.Request) {
-	start, end := dayBoundsUTC(time.Now())
+	start, end := dayBoundsIndia(time.Now().UTC())
 	const q = `
 		SELECT 1 FROM meditations
 		WHERE created_at >= $1 AND created_at < $2

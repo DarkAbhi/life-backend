@@ -56,7 +56,7 @@ func (a *API) CreateFuelFillup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	filledAt := time.Now()
+	filledAt := time.Now().UTC()
 	if in.FilledAt != nil {
 		filledAt = *in.FilledAt
 	}
@@ -131,7 +131,7 @@ func (a *API) UpdateFuelFillup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	filledAt := time.Now()
+	filledAt := time.Now().UTC()
 	if in.FilledAt != nil {
 		filledAt = *in.FilledAt
 	}

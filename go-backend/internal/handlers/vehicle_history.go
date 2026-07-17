@@ -66,6 +66,7 @@ func (a *API) VehicleHistory(w http.ResponseWriter, r *http.Request) {
 			serverError(w, err)
 			return
 		}
+		item.FilledAt = item.FilledAt.UTC()
 		air = append(air, item)
 	}
 	fuelRows, err := a.DB.Query(`SELECT id,odometer_km,filled_at,station_name,notes FROM vehicle_fuel_fillups WHERE vehicle_id=$1 AND user_id=$2 ORDER BY filled_at DESC,id DESC`, vehicleID, user.ID)
@@ -81,6 +82,7 @@ func (a *API) VehicleHistory(w http.ResponseWriter, r *http.Request) {
 			serverError(w, err)
 			return
 		}
+		fill.FilledAt = fill.FilledAt.UTC()
 		rows, err := a.DB.Query(`SELECT fuel_type,fill_type,quantity,unit_price,total_cost FROM vehicle_fuel_items WHERE fillup_id=$1 ORDER BY id`, fill.ID)
 		if err != nil {
 			serverError(w, err)

@@ -23,7 +23,6 @@ const timeFormatter = new Intl.DateTimeFormat("en-IN", {
   month: "short",
   hour: "numeric",
   minute: "2-digit",
-  timeZone: "Asia/Kolkata",
 });
 
 export function NotificationList({ notifications, onDismiss, onMarkGymVisited }: NotificationListProps) {

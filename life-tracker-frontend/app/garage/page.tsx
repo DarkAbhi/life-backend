@@ -25,7 +25,6 @@ const airFillFormatter = new Intl.DateTimeFormat("en-IN", {
   month: "short",
   hour: "numeric",
   minute: "2-digit",
-  timeZone: "Asia/Kolkata",
 });
 
 export default function Garage() {

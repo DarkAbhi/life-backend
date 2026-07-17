@@ -13,7 +13,7 @@ const gymReminderSource = "Gym reminder"
 // RunGymReminderJob creates the weekday gym reminder at 3:30 PM India time.
 // It also catches up after a restart later on the same eligible day.
 func RunGymReminderJob(database *sql.DB) {
-	createDueGymReminders(database, time.Now())
+	createDueGymReminders(database, time.Now().UTC())
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 	for now := range ticker.C {
@@ -22,7 +22,7 @@ func RunGymReminderJob(database *sql.DB) {
 }
 
 func createDueGymReminders(database *sql.DB, now time.Time) {
-	location, err := time.LoadLocation("Asia/Kolkata")
+	location, err := time.LoadLocation(indiaTimeZone)
 	if err != nil {
 		log.Printf("gym reminder timezone load failed: %v", err)
 		return

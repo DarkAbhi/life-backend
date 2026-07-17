@@ -18,7 +18,7 @@ func buildDSN() string {
 	pass := getenv("DB_PASSWORD", "pass")
 	name := getenv("DB_NAME", "life")
 	ssl := getenv("DB_SSLMODE", "disable")
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", user, pass, host, port, name, ssl)
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s&timezone=UTC", user, pass, host, port, name, ssl)
 }
 
 func migrationsPath() (string, error) {

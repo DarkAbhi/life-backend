@@ -15,6 +15,9 @@ import (
 )
 
 func main() {
+	// Keep operational logs in UTC so they are comparable across environments.
+	log.SetFlags(log.LstdFlags | log.LUTC | log.Lmicroseconds)
+
 	// Loads .env if present; harmless in containers if absent
 	_ = godotenv.Load()
 

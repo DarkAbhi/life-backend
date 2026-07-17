@@ -36,6 +36,8 @@ func (a *API) Router() http.Handler {
 		api.Post("/notifications/{id}/gym-visit", a.MarkGymReminderVisited)
 		api.Get("/next-month-purchases", a.NextMonthPurchases)
 		api.Post("/next-month-purchases", a.CreateNextMonthPurchase)
+		api.Delete("/next-month-purchases", a.ClearNextMonthPurchases)
+		api.Delete("/next-month-purchases/{id}", a.DeleteNextMonthPurchase)
 		// Daily logs
 		api.Get("/workout/today", a.GymVisitedToday)
 		api.Post("/workout/today", a.AddWorkoutForDay)

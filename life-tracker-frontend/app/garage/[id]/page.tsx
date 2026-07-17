@@ -11,7 +11,7 @@ type AirFill = { id: number; filled_at: string };
 type FuelItem = { fuel_type: string; fill_type: string; quantity: number; unit_price: number; total_cost: number };
 type FuelFill = { id: number; odometer_km: number; filled_at: string; station_name: string | null; notes: string | null; items: FuelItem[] };
 
-const formatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" });
+const formatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" });
 const toLocal = (value: string) => new Date(new Date(value).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 const toFormItem = (item: FuelItem): FuelFormItem => ({ fuelType: item.fuel_type, fillType: item.fill_type, quantity: String(item.quantity), unitPrice: String(item.unit_price), totalCost: String(item.total_cost) });
 

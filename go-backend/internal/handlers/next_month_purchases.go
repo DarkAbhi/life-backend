@@ -21,13 +21,16 @@ type purchaseDTO struct {
 	URL   *string `json:"url"`
 }
 
-func nextMonthStart() time.Time {
-	location, _ := time.LoadLocation("Asia/Kolkata")
+func nextMonthDate() string {
+	location, err := time.LoadLocation(indiaTimeZone)
+	if err != nil {
+		location = time.UTC
+	}
 	if location == nil {
 		location = time.UTC
 	}
-	now := time.Now().In(location)
-	return time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, location)
+	now := time.Now().UTC().In(location)
+	return time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, location).Format("2006-01-02")
 }
 func (a *API) NextMonthPurchases(w http.ResponseWriter, r *http.Request) {
 	user, err := a.sessionUser(r)
@@ -39,8 +42,8 @@ func (a *API) NextMonthPurchases(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	month := nextMonthStart()
-	rows, err := a.DB.Query(`SELECT id,name,price,url FROM next_month_purchases WHERE user_id=$1 AND target_month=$2 ORDER BY created_at DESC,id DESC`, user.ID, month)
+	month := nextMonthDate()
+	rows, err := a.DB.Query(`SELECT id,name,price,url FROM next_month_purchases WHERE user_id=$1 AND target_month=$2::date ORDER BY created_at DESC,id DESC`, user.ID, month)
 	if err != nil {
 		serverError(w, err)
 		return
@@ -80,10 +83,62 @@ func (a *API) CreateNextMonthPurchase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var item purchaseDTO
-	err = a.DB.QueryRow(`INSERT INTO next_month_purchases (user_id,target_month,name,price,url) VALUES ($1,$2,$3,$4,$5) RETURNING id,name,price,url`, user.ID, nextMonthStart(), in.Name, in.Price, in.URL).Scan(&item.ID, &item.Name, &item.Price, &item.URL)
+	err = a.DB.QueryRow(`INSERT INTO next_month_purchases (user_id,target_month,name,price,url) VALUES ($1,$2::date,$3,$4,$5) RETURNING id,name,price,url`, user.ID, nextMonthDate(), in.Name, in.Price, in.URL).Scan(&item.ID, &item.Name, &item.Price, &item.URL)
 	if err != nil {
 		serverError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, item)
+}
+
+// DeleteNextMonthPurchase removes one purchase from the upcoming month's list.
+func (a *API) DeleteNextMonthPurchase(w http.ResponseWriter, r *http.Request) {
+	user, err := a.sessionUser(r)
+	if errors.Is(err, sql.ErrNoRows) {
+		unauthorized(w, "session is invalid or expired")
+		return
+	}
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+
+	purchaseID, ok := parseID(w, r)
+	if !ok {
+		return
+	}
+	result, err := a.DB.Exec(`DELETE FROM next_month_purchases WHERE id=$1 AND user_id=$2 AND target_month=$3::date`, purchaseID, user.ID, nextMonthDate())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if deleted == 0 {
+		http.NotFound(w, r)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ClearNextMonthPurchases removes all purchases planned for the upcoming month.
+func (a *API) ClearNextMonthPurchases(w http.ResponseWriter, r *http.Request) {
+	user, err := a.sessionUser(r)
+	if errors.Is(err, sql.ErrNoRows) {
+		unauthorized(w, "session is invalid or expired")
+		return
+	}
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+
+	if _, err := a.DB.Exec(`DELETE FROM next_month_purchases WHERE user_id=$1 AND target_month=$2::date`, user.ID, nextMonthDate()); err != nil {
+		serverError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
