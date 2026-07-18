@@ -4,7 +4,6 @@ DROP TABLE IF EXISTS vehicle_fuel_items;
 DROP TABLE IF EXISTS vehicle_fuel_fillups;
 DROP TABLE IF EXISTS vehicle_air_fills;
 DROP TABLE IF EXISTS notifications;
-DROP TABLE IF EXISTS transactions;
 DROP TABLE IF EXISTS vehicles;
 DROP TABLE IF EXISTS sports;
 DROP TABLE IF EXISTS credit_cards;

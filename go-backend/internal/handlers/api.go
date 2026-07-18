@@ -48,12 +48,6 @@ func (a *API) Router() http.Handler {
 		api.Post("/meditation/today", a.AddMeditationForDay)
 		api.Post("/sport/today", a.AddSportForDay)
 
-		// Transactions
-		api.Route("/transactions", func(tx chi.Router) {
-			tx.Get("/", a.ListTransactions)
-			tx.Post("/", a.CreateTransaction)
-		})
-
 		// Vehicles
 		api.Get("/vehicles", a.ListVehicles)
 		api.Post("/vehicles", a.CreateVehicle) // create
