@@ -4,16 +4,12 @@ import Link from "next/link";
 import { AirFill, FuelFill } from "./types";
 import DeleteButton from "./delete-button";
 import EditFuelModal from "./edit-fuel-modal";
+import LocalDate from "../../components/local-date";
 
 const apiBaseURL =
   process.env.NEXT_PUBLIC_INTERNAL_API_BASE_URL ??
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   "http://localhost:8080";
-
-const formatter = new Intl.DateTimeFormat("en-IN", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -96,9 +92,9 @@ export default async function VehiclePage({ params, searchParams }: PageProps) {
                     key={fill.id}
                   >
                     <div className="flex justify-between gap-3">
-                      <p className="font-semibold" suppressHydrationWarning>
+                      <p className="font-semibold">
                         {fill.odometer_km} km ·{" "}
-                        {formatter.format(new Date(fill.filled_at))}
+                        <LocalDate dateString={fill.filled_at} />
                       </p>
                       <span className="flex items-center gap-3">
                         <Link
@@ -138,8 +134,8 @@ export default async function VehiclePage({ params, searchParams }: PageProps) {
                   className="flex items-center justify-between gap-3 rounded-2xl bg-white p-5 shadow-sm"
                   key={fill.id}
                 >
-                  <span suppressHydrationWarning>
-                    Air filled · {formatter.format(new Date(fill.filled_at))}
+                  <span>
+                    Air filled · <LocalDate dateString={fill.filled_at} />
                   </span>
                   <DeleteButton
                     vehicleId={id}

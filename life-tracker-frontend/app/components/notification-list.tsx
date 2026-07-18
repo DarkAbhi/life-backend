@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import LocalDate from "./local-date";
 
 export type AppNotification = {
   id: number;
@@ -17,13 +18,6 @@ type NotificationListProps = {
   onDismiss: (notificationID: number) => Promise<void>;
   onMarkGymVisited?: (notificationID: number) => Promise<void>;
 };
-
-const timeFormatter = new Intl.DateTimeFormat("en-IN", {
-  day: "numeric",
-  month: "short",
-  hour: "numeric",
-  minute: "2-digit",
-});
 
 export function NotificationList({ notifications, onDismiss, onMarkGymVisited }: NotificationListProps) {
   return (
@@ -121,7 +115,18 @@ function NotificationCard({ notification, onDismiss, onMarkGymVisited }: { notif
             {isMarkingGymVisited ? "Saving your visit…" : "I visited the gym"}
           </button>
         )}
-        <p suppressHydrationWarning className="mt-3 text-xs text-stone-400">{timeFormatter.format(new Date(notification.created_at))} · Swipe left to dismiss</p>
+        <p className="mt-3 text-xs text-stone-400">
+          <LocalDate
+            dateString={notification.created_at}
+            options={{
+              day: "numeric",
+              month: "short",
+              hour: "numeric",
+              minute: "2-digit",
+            }}
+          />{" "}
+          · Swipe left to dismiss
+        </p>
       </article>
     </div>
   );
