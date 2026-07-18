@@ -144,58 +144,58 @@ export default function GymVisit() {
   }
 
   return (
-    <main className="min-h-screen bg-[#fffaf3] px-6 py-10 text-stone-800 sm:px-10 lg:px-16">
+    <main className="min-h-screen bg-background px-6 py-10 text-foreground sm:px-10 lg:px-16">
       <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1.15fr_0.85fr]">
         <section>
           <div className="flex items-start justify-between gap-4">
             <Link
-              className="text-sm font-semibold text-emerald-800 transition hover:text-emerald-950"
+              className="text-sm font-semibold text-primary transition hover:opacity-80"
               href="/dashboard"
             >
               ← Dashboard
             </Link>
             <button
-              className="rounded-lg px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-destructive transition hover:bg-destructive/10"
               onClick={() => setIsConfirmingDelete(true)}
               type="button"
             >
               Delete visit
             </button>
           </div>
-          <p className="mt-5 text-sm font-semibold tracking-[0.18em] text-emerald-700">
+          <p className="mt-5 text-sm font-semibold tracking-[0.18em] text-primary">
             GYM VISIT
           </p>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             Today&apos;s workout
           </h1>
-          <p className="mt-3 text-base text-stone-600">
+          <p className="mt-3 text-base text-muted-foreground">
             Capture what you did, one exercise and set at a time.
           </p>
 
           <div className="mt-8 space-y-4">
             {isLoading ? (
-              <p className="text-stone-600">Loading exercises…</p>
+              <p className="text-muted-foreground">Loading exercises…</p>
             ) : exercises.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-emerald-200 bg-white/70 p-8">
-                <p className="font-semibold text-stone-800">
+              <div className="rounded-2xl border border-dashed border-border bg-card p-8">
+                <p className="font-semibold text-foreground">
                   No exercises saved yet.
                 </p>
-                <p className="mt-2 text-sm text-stone-600">
+                <p className="mt-2 text-sm text-muted-foreground">
                   Add your first exercise using the form.
                 </p>
               </div>
             ) : (
               exercises.map((exercise) => (
                 <article
-                  className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm"
+                  className="rounded-2xl border border-border bg-card p-6 shadow-sm"
                   key={exercise.id}
                 >
-                  <h2 className="text-xl font-semibold text-stone-900">
+                  <h2 className="text-xl font-semibold text-foreground">
                     {exercise.name}
                   </h2>
-                  <div className="mt-4 overflow-hidden rounded-lg border border-stone-100">
+                  <div className="mt-4 overflow-hidden rounded-lg border border-border">
                     <table className="w-full text-left text-sm">
-                      <thead className="bg-stone-50 text-stone-500">
+                      <thead className="bg-muted text-muted-foreground">
                         <tr>
                           <th className="px-4 py-3 font-medium">Set</th>
                           <th className="px-4 py-3 font-medium">Reps</th>
@@ -205,12 +205,12 @@ export default function GymVisit() {
                       <tbody>
                         {exercise.sets.map((set) => (
                           <tr
-                            className="border-t border-stone-100"
+                            className="border-t border-border"
                             key={set.id}
                           >
-                            <td className="px-4 py-3">{set.set_number}</td>
-                            <td className="px-4 py-3">{set.reps}</td>
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-3 text-muted-foreground">{set.set_number}</td>
+                            <td className="px-4 py-3 text-muted-foreground">{set.reps}</td>
+                            <td className="px-4 py-3 text-muted-foreground">
                               {set.weight === null
                                 ? "Bodyweight"
                                 : `${set.weight} kg`}
@@ -226,20 +226,20 @@ export default function GymVisit() {
           </div>
         </section>
 
-        <aside className="h-fit rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="text-xl font-semibold text-stone-900">
+        <aside className="h-fit rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+          <h2 className="text-xl font-semibold text-foreground">
             Add an exercise
           </h2>
           <form className="mt-6 space-y-5" onSubmit={saveExercise}>
             <div>
               <label
-                className="mb-2 block text-sm font-medium text-stone-700"
+                className="mb-2 block text-sm font-medium text-muted-foreground"
                 htmlFor="exercise-name"
               >
                 Workout name
               </label>
               <input
-                className="w-full rounded-lg border border-stone-300 px-4 py-3 outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100"
+                className="w-full rounded-lg border border-border bg-background text-foreground px-4 py-3 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                 id="exercise-name"
                 maxLength={100}
                 onChange={(event) => setExerciseName(event.target.value)}
@@ -250,7 +250,7 @@ export default function GymVisit() {
             </div>
 
             <fieldset className="space-y-3">
-              <legend className="text-sm font-medium text-stone-700">
+              <legend className="text-sm font-medium text-muted-foreground">
                 Sets
               </legend>
               {sets.map((set, index) => (
@@ -258,13 +258,13 @@ export default function GymVisit() {
                   className="grid grid-cols-[auto_1fr_1fr] items-end gap-2"
                   key={index}
                 >
-                  <span className="pb-3 text-sm font-semibold text-stone-500">
+                  <span className="pb-3 text-sm font-semibold text-muted-foreground">
                     {index + 1}
                   </span>
-                  <label className="text-xs font-medium text-stone-500">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Reps
                     <input
-                      className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      className="mt-1 w-full rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                       min="1"
                       onChange={(event) =>
                         updateSet(index, "reps", event.target.value)
@@ -274,10 +274,10 @@ export default function GymVisit() {
                       value={set.reps}
                     />
                   </label>
-                  <label className="text-xs font-medium text-stone-500">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Weight (kg)
                     <input
-                      className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      className="mt-1 w-full rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                       min="0"
                       onChange={(event) =>
                         updateSet(index, "weight", event.target.value)
@@ -291,7 +291,7 @@ export default function GymVisit() {
                 </div>
               ))}
               <button
-                className="text-sm font-semibold text-emerald-800 transition hover:text-emerald-950"
+                className="text-sm font-semibold text-primary transition hover:opacity-80"
                 onClick={() =>
                   setSets((currentSets) => [...currentSets, newSet()])
                 }
@@ -302,12 +302,12 @@ export default function GymVisit() {
             </fieldset>
 
             {error && (
-              <p className="text-sm text-red-600" role="alert">
+              <p className="text-sm text-destructive" role="alert">
                 {error}
               </p>
             )}
             <button
-              className="w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-300"
+              className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
               disabled={isSaving}
               type="submit"
             >

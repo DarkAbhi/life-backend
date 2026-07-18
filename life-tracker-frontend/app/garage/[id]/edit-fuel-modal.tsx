@@ -79,19 +79,19 @@ export default function EditFuelModal({ vehicleId, fill }: EditFuelModalProps) {
   return (
     <>
       <div
-        className="fixed inset-0 z-10 overflow-y-auto bg-stone-950/40 px-6 py-8"
+        className="fixed inset-0 z-10 overflow-y-auto bg-overlay-bg px-6 py-8"
         role="dialog"
         aria-labelledby="fuel-title"
         aria-modal="true"
       >
-        <section className="mx-auto w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
+        <section className="mx-auto w-full max-w-2xl rounded-2xl bg-card border border-border p-6 shadow-2xl sm:p-8">
           <h2
-            className="text-2xl font-bold tracking-tight text-stone-900"
+            className="text-2xl font-bold tracking-tight text-foreground"
             id="fuel-title"
           >
             Edit fuel fill-up
           </h2>
-          <p className="mt-2 text-sm text-stone-600">
+          <p className="mt-2 text-sm text-muted-foreground">
             Enter any two fuel-cost values; the third is calculated
             automatically when saved.
           </p>
@@ -119,13 +119,13 @@ export default function EditFuelModal({ vehicleId, fill }: EditFuelModalProps) {
       {/* Error Toast Notification */}
       {toastError && (
         <div
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl border border-red-100 bg-red-50/90 p-4 text-red-900 shadow-xl backdrop-blur-md transition-all duration-300"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-destructive shadow-xl backdrop-blur-md transition-all duration-300"
           role="alert"
         >
           <span className="text-sm font-medium">{toastError}</span>
           <button
             onClick={() => setToastError("")}
-            className="text-red-500 hover:text-red-700 font-bold"
+            className="text-destructive hover:opacity-80 font-bold"
             type="button"
             aria-label="Close"
           >

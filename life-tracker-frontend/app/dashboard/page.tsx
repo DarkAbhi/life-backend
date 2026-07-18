@@ -258,70 +258,70 @@ export default function Dashboard() {
 
   if (isLoading || !username) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-600">
+      <main className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
         Loading your dashboard…
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#fffaf3] px-6 py-10 text-stone-800 sm:px-10 lg:px-16">
+    <main className="min-h-screen bg-background px-6 py-10 text-foreground sm:px-10 lg:px-16">
       <div className="mx-auto max-w-6xl">
         <header className="mb-10">
-          <p className="text-sm font-semibold tracking-[0.18em] text-amber-700">
+          <p className="text-sm font-semibold tracking-[0.18em] text-primary">
             LIFE TRACKER
           </p>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             {greeting}, {displayName || username}.
           </h1>
-          <p className="mt-3 text-base text-stone-600">{greetingNote}</p>
+          <p className="mt-3 text-base text-muted-foreground">{greetingNote}</p>
         </header>
 
         <section aria-labelledby="categories-heading">
           <div className="mb-4 flex items-center justify-between">
             <h2
-              className="text-lg font-semibold text-stone-800"
+              className="text-lg font-semibold text-foreground"
               id="categories-heading"
             >
               Your spaces
             </h2>
-            <span className="text-sm text-stone-500">More coming soon</span>
+            <span className="text-sm text-muted-foreground">More coming soon</span>
           </div>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             <Link
-              className="group rounded-2xl border border-amber-100 bg-white p-6 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-amber-100/70"
+              className="group rounded-2xl border border-border bg-card p-6 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg"
               href="/garage"
             >
               <div
-                className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-xl"
+                className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-secondary-foreground text-xl"
                 aria-hidden="true"
               >
                 🚗
               </div>
-              <h3 className="mt-5 text-xl font-semibold text-stone-900">
+              <h3 className="mt-5 text-xl font-semibold text-foreground">
                 Garage
               </h3>
-              <p className="mt-2 text-sm leading-6 text-stone-600">
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 Keep the details of your vehicles close at hand.
               </p>
-              <span className="mt-5 inline-flex text-sm font-semibold text-amber-800 transition group-hover:text-amber-950">
+              <span className="mt-5 inline-flex text-sm font-semibold text-primary transition group-hover:opacity-80">
                 Explore garage →
               </span>
             </Link>
             <article
-              className="cursor-pointer rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-emerald-100/70"
+              className="cursor-pointer rounded-2xl border border-border bg-card p-6 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg"
               onClick={() => router.push("/gym-visits")}
             >
               <div
-                className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 text-xl"
+                className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-secondary-foreground text-xl"
                 aria-hidden="true"
               >
                 {gymVisited ? "✓" : "🏋️"}
               </div>
-              <h3 className="mt-5 text-xl font-semibold text-stone-900">
+              <h3 className="mt-5 text-xl font-semibold text-foreground">
                 Gym visit
               </h3>
-              <p className="mt-2 text-sm leading-6 text-stone-600">
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {isGymLoading
                   ? "Checking in on your day…"
                   : gymVisited
@@ -329,12 +329,12 @@ export default function Dashboard() {
                     : "A little movement can make a big difference."}
               </p>
               {gymError && (
-                <p className="mt-3 text-sm text-red-600" role="alert">
+                <p className="mt-3 text-sm text-destructive" role="alert">
                   {gymError}
                 </p>
               )}
               <button
-                className="mt-5 w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                className="mt-5 w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                 disabled={isGymLoading || isMarkingGym}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -354,7 +354,7 @@ export default function Dashboard() {
               </button>
               {gymVisited && gymVisitID && (
                 <Link
-                  className="mt-3 block w-full rounded-lg border border-emerald-200 px-4 py-3 text-center text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50"
+                  className="mt-3 block w-full rounded-lg border border-border px-4 py-3 text-center text-sm font-semibold text-primary transition hover:bg-accent"
                   href={`/gym-visits/${gymVisitID}`}
                   onClick={(event) => event.stopPropagation()}
                 >
@@ -369,37 +369,37 @@ export default function Dashboard() {
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
               <h2
-                className="text-lg font-semibold text-stone-800"
+                className="text-lg font-semibold text-foreground"
                 id="notifications-heading"
               >
                 Notification center
               </h2>
-              <p className="mt-1 text-sm text-stone-500">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Recent updates from your spaces.
               </p>
             </div>
             <Link
-              className="shrink-0 text-sm font-semibold text-amber-800 transition hover:text-amber-950"
+              className="shrink-0 text-sm font-semibold text-primary transition hover:opacity-85"
               href="/notifications"
             >
               View all →
             </Link>
           </div>
           {isNotificationsLoading ? (
-            <p className="text-sm text-stone-600">Checking for updates…</p>
+            <p className="text-sm text-muted-foreground">Checking for updates…</p>
           ) : notificationsError ? (
             <p
-              className="rounded-xl bg-red-50 p-4 text-sm text-red-700"
+              className="rounded-xl bg-destructive/10 p-4 text-sm text-destructive"
               role="alert"
             >
               {notificationsError}
             </p>
           ) : notifications.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-amber-200 bg-white/70 p-7 text-center">
-              <p className="font-semibold text-stone-800">
+            <div className="rounded-2xl border border-dashed border-border bg-card/70 p-7 text-center">
+              <p className="font-semibold text-foreground">
                 You&apos;re all caught up.
               </p>
-              <p className="mt-1 text-sm text-stone-600">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Updates from your spaces will appear here.
               </p>
             </div>
@@ -413,23 +413,23 @@ export default function Dashboard() {
         </section>
 
         <section
-          className="mt-12 max-w-xl rounded-2xl border border-sky-100 bg-white p-6 shadow-sm"
+          className="mt-12 max-w-xl rounded-2xl border border-border bg-card p-6 shadow-sm"
           aria-labelledby="next-month-heading"
         >
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2
-                className="text-lg font-semibold text-stone-800"
+                className="text-lg font-semibold text-foreground"
                 id="next-month-heading"
               >
                 Next month purchases
               </h2>
-              <p className="mt-1 text-sm text-stone-500">
+              <p className="mt-1 text-sm text-muted-foreground">
                 A small place for the things you&apos;ll need soon.
               </p>
             </div>
             <Link
-              className="shrink-0 text-sm font-semibold text-sky-800"
+              className="shrink-0 text-sm font-semibold text-primary"
               href="/next-month"
             >
               View all →
@@ -440,14 +440,14 @@ export default function Dashboard() {
             onSubmit={addNextMonthPurchase}
           >
             <input
-              className="rounded-lg border border-stone-300 px-3 py-2 text-sm"
+              className="rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm"
               onChange={(e) => setPurchaseName(e.target.value)}
               placeholder="Item name"
               required
               value={purchaseName}
             />
             <input
-              className="rounded-lg border border-stone-300 px-3 py-2 text-sm"
+              className="rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm"
               min="0"
               onChange={(e) => setPurchasePrice(e.target.value)}
               placeholder="Price"
@@ -457,19 +457,19 @@ export default function Dashboard() {
               value={purchasePrice}
             />
             <input
-              className="sm:col-span-2 rounded-lg border border-stone-300 px-3 py-2 text-sm"
+              className="sm:col-span-2 rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm"
               onChange={(e) => setPurchaseURL(e.target.value)}
               placeholder="Optional URL"
               type="url"
               value={purchaseURL}
             />
             {purchaseError && (
-              <p className="sm:col-span-2 text-sm text-red-600" role="alert">
+              <p className="sm:col-span-2 text-sm text-destructive" role="alert">
                 {purchaseError}
               </p>
             )}
             <button
-              className="sm:col-span-2 rounded-lg bg-sky-700 px-4 py-3 text-sm font-semibold text-white disabled:bg-sky-300"
+              className="sm:col-span-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:bg-muted disabled:text-muted-foreground"
               disabled={isSavingPurchase}
               type="submit"
             >
@@ -481,31 +481,31 @@ export default function Dashboard() {
 
       {needsProfile && (
         <div
-          className="fixed inset-0 flex items-center justify-center bg-slate-950/40 px-6"
+          className="fixed inset-0 flex items-center justify-center bg-overlay-bg px-6"
           role="dialog"
           aria-modal="true"
           aria-labelledby="name-dialog-title"
         >
-          <section className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
+          <section className="w-full max-w-md rounded-2xl bg-card border border-border p-8 shadow-2xl">
             <h2
-              className="text-2xl font-bold tracking-tight"
+              className="text-2xl font-bold tracking-tight text-foreground"
               id="name-dialog-title"
             >
               What is your name?
             </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
               We&apos;ll use it to personalize your dashboard.
             </p>
             <form className="mt-6 space-y-4" onSubmit={saveName}>
               <label
-                className="block text-sm font-medium text-slate-700"
+                className="block text-sm font-medium text-muted-foreground"
                 htmlFor="display-name"
               >
                 Your name
               </label>
               <input
                 autoFocus
-                className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100"
+                className="w-full rounded-lg border border-border bg-background text-foreground px-4 py-3 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                 id="display-name"
                 maxLength={120}
                 onChange={(event) => setDisplayName(event.target.value)}
@@ -513,12 +513,12 @@ export default function Dashboard() {
                 value={displayName}
               />
               {error && (
-                <p className="text-sm text-red-600" role="alert">
+                <p className="text-sm text-destructive" role="alert">
                   {error}
                 </p>
               )}
               <button
-                className="w-full rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+                className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted"
                 disabled={isSaving}
                 type="submit"
               >

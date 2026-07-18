@@ -69,23 +69,23 @@ export default function NextMonthClient({
   const isMutationLoading = isPending || deletingID !== null || isClearing;
 
   return (
-    <main className="min-h-screen bg-[#fffaf3] px-6 py-10 text-stone-800 sm:px-10">
+    <main className="min-h-screen bg-background px-6 py-10 text-foreground sm:px-10">
       <div className="mx-auto max-w-3xl">
-        <Link className="text-sm font-semibold text-sky-800" href="/dashboard">
+        <Link className="text-sm font-semibold text-primary" href="/dashboard">
           ← Dashboard
         </Link>
         <header className="mt-6 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-stone-900">
+            <h1 className="text-3xl font-bold text-foreground">
               Next month purchases
             </h1>
-            <p className="mt-2 text-stone-600">
+            <p className="mt-2 text-muted-foreground">
               Planned total:{" "}
               <span className="font-semibold">₹{total.toFixed(2)}</span>
             </p>
           </div>
           <button
-            className="shrink-0 rounded-lg border border-red-200 px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:text-red-300"
+            className="shrink-0 rounded-lg border border-destructive px-4 py-3 text-sm font-semibold text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isMutationLoading || items.length === 0}
             onClick={() => {
               setError("");
@@ -99,7 +99,7 @@ export default function NextMonthClient({
 
         {error && !purchaseToDelete && !isConfirmingClearAll && (
           <p
-            className="mt-8 rounded-2xl bg-red-50 p-4 text-sm text-red-700"
+            className="mt-8 rounded-2xl bg-destructive/10 p-4 text-sm text-destructive"
             role="alert"
           >
             {error}
@@ -107,19 +107,19 @@ export default function NextMonthClient({
         )}
 
         {items.length === 0 ? (
-          <p className="mt-8 rounded-2xl bg-white p-6">Nothing planned yet.</p>
+          <p className="mt-8 rounded-2xl bg-card border border-border p-6 text-muted-foreground">Nothing planned yet.</p>
         ) : (
           <div className="mt-8 space-y-3">
             {items.map((item) => (
               <article
-                className="flex items-center justify-between gap-4 rounded-2xl bg-white p-5 shadow-sm"
+                className="flex items-center justify-between gap-4 rounded-2xl bg-card border border-border p-5 shadow-sm"
                 key={item.id}
               >
                 <div>
-                  <h2 className="font-semibold">{item.name}</h2>
+                  <h2 className="font-semibold text-foreground">{item.name}</h2>
                   {item.url && (
                     <a
-                      className="mt-1 block text-sm text-sky-700 underline"
+                      className="mt-1 block text-sm text-primary underline"
                       href={item.url}
                       rel="noreferrer"
                       target="_blank"
@@ -129,9 +129,9 @@ export default function NextMonthClient({
                   )}
                 </div>
                 <div className="flex items-center gap-4">
-                  <strong>₹{item.price.toFixed(2)}</strong>
+                  <strong className="text-foreground">₹{item.price.toFixed(2)}</strong>
                   <button
-                    className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:text-red-300"
+                    className="rounded-lg border border-destructive px-3 py-2 text-sm font-semibold text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={isMutationLoading}
                     onClick={() => {
                       setError("");

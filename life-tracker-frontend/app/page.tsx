@@ -61,21 +61,21 @@ export default function Home() {
 
   if (isCheckingSession) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-600">
+      <main className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
         Checking your session…
       </main>
     );
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6 py-12 text-slate-900">
-      <section className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl shadow-slate-200/70 sm:p-10">
+    <main className="flex min-h-screen items-center justify-center bg-background px-6 py-12 text-foreground">
+      <section className="w-full max-w-md rounded-2xl bg-card border border-border p-8 shadow-xl sm:p-10">
         <div className="mb-8">
-          <p className="mb-2 text-sm font-semibold tracking-wide text-indigo-600">
+          <p className="mb-2 text-sm font-semibold tracking-wide text-primary">
             LIFE TRACKER
           </p>
           <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Sign in to continue to your dashboard.
           </p>
         </div>
@@ -83,14 +83,14 @@ export default function Home() {
         <form className="space-y-5" onSubmit={handleSubmit}>
           <div>
             <label
-              className="mb-2 block text-sm font-medium text-slate-700"
+              className="mb-2 block text-sm font-medium text-muted-foreground"
               htmlFor="username"
             >
               Username
             </label>
             <input
               autoComplete="username"
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base outline-none transition placeholder:text-slate-400 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100"
+              className="w-full rounded-lg border border-border bg-background px-4 py-3 text-base outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-4 focus:ring-primary/15"
               id="username"
               name="username"
               defaultValue="admin"
@@ -102,14 +102,14 @@ export default function Home() {
 
           <div>
             <label
-              className="mb-2 block text-sm font-medium text-slate-700"
+              className="mb-2 block text-sm font-medium text-muted-foreground"
               htmlFor="password"
             >
               Password
             </label>
             <input
               autoComplete="current-password"
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base outline-none transition placeholder:text-slate-400 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100"
+              className="w-full rounded-lg border border-border bg-background px-4 py-3 text-base outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-4 focus:ring-primary/15"
               id="password"
               name="password"
               placeholder="Enter your password"
@@ -119,13 +119,13 @@ export default function Home() {
           </div>
 
           <button
-            className="w-full rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:bg-indigo-300"
+            className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus:outline-none focus:ring-4 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
             disabled={isSubmitting}
             type="submit"
           >
             {isSubmitting ? "Signing in…" : "Continue"}
           </button>
-          {error && <p className="text-center text-sm text-red-600" role="alert">{error}</p>}
+          {error && <p className="text-center text-sm text-destructive" role="alert">{error}</p>}
         </form>
       </section>
     </main>

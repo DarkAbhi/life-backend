@@ -42,7 +42,7 @@ export default function DeleteButton({
   return (
     <>
       <button
-        className="text-sm font-semibold text-red-700 disabled:opacity-50"
+        className="text-sm font-semibold text-destructive disabled:opacity-50"
         onClick={() => setIsOpen(true)}
         type="button"
       >
@@ -64,13 +64,13 @@ export default function DeleteButton({
       {/* Error Toast Notification */}
       {toastError && (
         <div
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl border border-red-100 bg-red-50/90 p-4 text-red-900 shadow-xl backdrop-blur-md transition-all duration-300"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-destructive shadow-xl backdrop-blur-md transition-all duration-300"
           role="alert"
         >
           <span className="text-sm font-medium">{toastError}</span>
           <button
             onClick={() => setToastError("")}
-            className="text-red-500 hover:text-red-700 font-bold"
+            className="text-destructive hover:opacity-80 font-bold"
             type="button"
             aria-label="Close"
           >

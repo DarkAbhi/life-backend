@@ -57,12 +57,12 @@ function NotificationCard({ notification, onDismiss, onMarkGymVisited }: { notif
   }
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-red-700">
-      <div className="absolute inset-y-0 right-0 flex w-28 items-center justify-center text-sm font-semibold text-white">
+    <div className="relative overflow-hidden rounded-2xl bg-destructive">
+      <div className="absolute inset-y-0 right-0 flex w-28 items-center justify-center text-sm font-semibold text-destructive-foreground">
         Dismiss
       </div>
       <article
-        className="relative rounded-2xl border border-amber-100 bg-white p-5 shadow-sm transition-transform"
+        className="relative rounded-2xl border border-border bg-card p-5 shadow-sm transition-transform"
         onPointerDown={(event) => {
           startX.current = event.clientX;
           event.currentTarget.setPointerCapture(event.pointerId);
@@ -83,16 +83,16 @@ function NotificationCard({ notification, onDismiss, onMarkGymVisited }: { notif
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">{notification.source}</p>
-            <h3 className="mt-1 font-semibold text-stone-900">{notification.title}</h3>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">{notification.source}</p>
+            <h3 className="mt-1 font-semibold text-foreground">{notification.title}</h3>
           </div>
           <button
             aria-label={`Dismiss ${notification.title}`}
-            className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-stone-500 transition hover:bg-stone-100 hover:text-stone-800"
+            className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
             disabled={isDismissing}
             onClick={(event) => {
-              event.stopPropagation();
-              void dismiss();
+               event.stopPropagation();
+               void dismiss();
             }}
             onPointerDown={(event) => event.stopPropagation()}
             type="button"
@@ -100,10 +100,10 @@ function NotificationCard({ notification, onDismiss, onMarkGymVisited }: { notif
             Dismiss
           </button>
         </div>
-        {notification.body && <p className="mt-2 text-sm leading-6 text-stone-600">{notification.body}</p>}
+        {notification.body && <p className="mt-2 text-sm leading-6 text-muted-foreground">{notification.body}</p>}
         {isGymReminder && onMarkGymVisited && (
           <button
-            className="mt-4 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-300"
+            className="mt-4 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
             disabled={isMarkingGymVisited || isDismissing}
             onClick={(event) => {
               event.stopPropagation();
@@ -115,7 +115,7 @@ function NotificationCard({ notification, onDismiss, onMarkGymVisited }: { notif
             {isMarkingGymVisited ? "Saving your visit…" : "I visited the gym"}
           </button>
         )}
-        <p className="mt-3 text-xs text-stone-400">
+        <p className="mt-3 text-xs text-muted-foreground/80">
           <LocalDate
             dateString={notification.created_at}
             options={{

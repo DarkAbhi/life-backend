@@ -218,28 +218,28 @@ export default function Garage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#fffaf3] px-6 py-10 text-stone-800 sm:px-10 lg:px-16">
+    <main className="min-h-screen bg-background px-6 py-10 text-foreground sm:px-10 lg:px-16">
       <div className="mx-auto max-w-6xl">
         <header className="mb-10 flex items-start justify-between gap-4">
           <div>
             <Link
-              className="text-sm font-semibold text-amber-800 transition hover:text-amber-950"
+              className="text-sm font-semibold text-primary transition hover:opacity-80"
               href="/dashboard"
             >
               ← Dashboard
             </Link>
-            <p className="mt-5 text-sm font-semibold tracking-[0.18em] text-amber-700">
+            <p className="mt-5 text-sm font-semibold tracking-[0.18em] text-primary">
               LIFE TRACKER
             </p>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
               Garage
             </h1>
-            <p className="mt-3 text-base text-stone-600">
+            <p className="mt-3 text-base text-muted-foreground">
               A simple home for every vehicle in your life.
             </p>
           </div>
           <button
-            className="shrink-0 rounded-lg bg-amber-700 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-800 focus:outline-none focus:ring-4 focus:ring-amber-200"
+            className="shrink-0 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus:outline-none focus:ring-4 focus:ring-primary/20"
             onClick={() => {
               setError("");
               setIsAddOpen(true);
@@ -251,20 +251,20 @@ export default function Garage() {
         </header>
 
         {isLoading ? (
-          <p className="text-stone-600">Loading your vehicles…</p>
+          <p className="text-muted-foreground">Loading your vehicles…</p>
         ) : error && !isAddOpen ? (
           <p
-            className="rounded-xl bg-red-50 p-4 text-sm text-red-700"
+            className="rounded-xl bg-destructive/10 p-4 text-sm text-destructive"
             role="alert"
           >
             {error}
           </p>
         ) : vehicles.length === 0 ? (
-          <section className="rounded-2xl border border-dashed border-amber-200 bg-white/70 p-10 text-center">
-            <p className="text-lg font-semibold text-stone-800">
+          <section className="rounded-2xl border border-dashed border-border bg-card/70 p-10 text-center">
+            <p className="text-lg font-semibold text-foreground">
               Your garage is ready for its first vehicle.
             </p>
-            <p className="mt-2 text-sm text-stone-600">
+            <p className="mt-2 text-sm text-muted-foreground">
               Add one whenever you&apos;re ready.
             </p>
           </section>
@@ -275,26 +275,26 @@ export default function Garage() {
           >
             {vehicles.map((vehicle) => (
               <article
-                className="cursor-pointer rounded-2xl border border-amber-100 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                className="cursor-pointer rounded-2xl border border-border bg-card p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 key={vehicle.id}
                 onClick={() => router.push(`/garage/${vehicle.id}`)}
               >
                 <div
-                  className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-lg"
+                  className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-secondary-foreground text-lg"
                   aria-hidden="true"
                 >
                   🚗
                 </div>
-                <h2 className="mt-4 text-lg font-semibold text-stone-900">
+                <h2 className="mt-4 text-lg font-semibold text-foreground">
                   {vehicle.name}
                 </h2>
-                <p className="mt-4 text-sm text-stone-600">
+                <p className="mt-4 text-sm text-muted-foreground">
                   {latestAirFills[vehicle.id]
                     ? `Air last filled ${airFillFormatter.format(new Date(latestAirFills[vehicle.id]))}`
                     : "No air fill recorded yet."}
                 </p>
                 <button
-                  className="mt-4 w-full rounded-lg border border-amber-200 px-4 py-3 text-sm font-semibold text-amber-900 transition hover:bg-amber-50"
+                  className="mt-4 w-full rounded-lg border border-border px-4 py-3 text-sm font-semibold text-primary transition hover:bg-accent"
                   onClick={(event) => {
                     event.stopPropagation();
                     setAirFillError("");
@@ -305,7 +305,7 @@ export default function Garage() {
                   Mark air filled now
                 </button>
                 <button
-                  className="mt-3 w-full rounded-lg bg-stone-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-stone-900"
+                  className="mt-3 w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
                   onClick={(event) => {
                     event.stopPropagation();
                     setFuelError("");
@@ -323,31 +323,31 @@ export default function Garage() {
 
       {isAddOpen && (
         <div
-          className="fixed inset-0 flex items-center justify-center bg-stone-950/40 px-6"
+          className="fixed inset-0 flex items-center justify-center bg-overlay-bg px-6"
           role="dialog"
           aria-labelledby="add-vehicle-title"
           aria-modal="true"
         >
-          <section className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
+          <section className="w-full max-w-md rounded-2xl bg-card border border-border p-8 shadow-2xl">
             <h2
-              className="text-2xl font-bold tracking-tight text-stone-900"
+              className="text-2xl font-bold tracking-tight text-foreground"
               id="add-vehicle-title"
             >
               Add a vehicle
             </h2>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
               Give it a name you&apos;ll recognize right away.
             </p>
             <form className="mt-6 space-y-4" onSubmit={addVehicle}>
               <label
-                className="block text-sm font-medium text-stone-700"
+                className="block text-sm font-medium text-muted-foreground"
                 htmlFor="vehicle-name"
               >
                 Vehicle name
               </label>
               <input
                 autoFocus
-                className="w-full rounded-lg border border-stone-300 px-4 py-3 outline-none transition focus:border-amber-700 focus:ring-4 focus:ring-amber-100"
+                className="w-full rounded-lg border border-border bg-background text-foreground px-4 py-3 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                 id="vehicle-name"
                 maxLength={48}
                 onChange={(event) => setVehicleName(event.target.value)}
@@ -356,13 +356,13 @@ export default function Garage() {
                 value={vehicleName}
               />
               {error && (
-                <p className="text-sm text-red-600" role="alert">
+                <p className="text-sm text-destructive" role="alert">
                   {error}
                 </p>
               )}
               <div className="flex gap-3 pt-2">
                 <button
-                  className="flex-1 rounded-lg border border-stone-300 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+                  className="flex-1 rounded-lg border border-btn-cancel-border bg-btn-cancel-bg text-btn-cancel-text hover:bg-btn-cancel-hover px-4 py-3 text-sm font-semibold transition"
                   disabled={isSaving}
                   onClick={() => setIsAddOpen(false)}
                   type="button"
@@ -370,7 +370,7 @@ export default function Garage() {
                   Cancel
                 </button>
                 <button
-                  className="flex-1 rounded-lg bg-amber-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-amber-300"
+                  className="flex-1 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                   disabled={isSaving}
                   type="submit"
                 >
@@ -389,7 +389,7 @@ export default function Garage() {
         title="Mark air filled?"
         description={
           pendingAirFillVehicle
-            ? `Record that you filled air in ${pendingAirFillVehicle.name} right now. We'll remind you again in 30 days.`
+             ? `Record that you filled air in ${pendingAirFillVehicle.name} right now. We'll remind you again in 30 days.`
             : ""
         }
         confirmText="Yes, mark air filled"
@@ -401,19 +401,19 @@ export default function Garage() {
 
       {fuelVehicle && (
         <div
-          className="fixed inset-0 z-10 overflow-y-auto bg-stone-950/40 px-6 py-8"
+          className="fixed inset-0 z-10 overflow-y-auto bg-overlay-bg px-6 py-8"
           role="dialog"
           aria-labelledby="fuel-title"
           aria-modal="true"
         >
-          <section className="mx-auto w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
+          <section className="mx-auto w-full max-w-2xl rounded-2xl bg-card border border-border p-6 shadow-2xl sm:p-8">
             <h2
-              className="text-2xl font-bold tracking-tight text-stone-900"
+              className="text-2xl font-bold tracking-tight text-foreground"
               id="fuel-title"
             >
               Add fuel for {fuelVehicle.name}
             </h2>
-            <p className="mt-2 text-sm text-stone-600">
+            <p className="mt-2 text-sm text-muted-foreground">
               Enter any two fuel-cost values; the third is calculated
               automatically when saved.
             </p>
