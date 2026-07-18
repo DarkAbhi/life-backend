@@ -121,7 +121,7 @@ function NotificationCard({ notification, onDismiss, onMarkGymVisited }: { notif
             {isMarkingGymVisited ? "Saving your visit…" : "I visited the gym"}
           </button>
         )}
-        <p className="mt-3 text-xs text-stone-400">{timeFormatter.format(new Date(notification.created_at))} · Swipe left to dismiss</p>
+        <p suppressHydrationWarning className="mt-3 text-xs text-stone-400">{timeFormatter.format(new Date(notification.created_at))} · Swipe left to dismiss</p>
       </article>
     </div>
   );
