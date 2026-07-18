@@ -120,6 +120,31 @@ func (h *Handler) Session(w http.ResponseWriter, r *http.Request) {
 	webutil.WriteJSON(w, http.StatusOK, map[string]string{"username": user.Username})
 }
 
+// Logout deletes the database session and clears the cookie.
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie(SessionCookieName)
+	if err == nil && cookie.Value != "" {
+		hash := sha256.Sum256([]byte(cookie.Value))
+		_, _ = h.DB.Exec(
+			`DELETE FROM user_sessions WHERE token_hash = $1`,
+			hex.EncodeToString(hash[:]),
+		)
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     SessionCookieName,
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   os.Getenv("APP_ENV") == "production",
+	})
+	webutil.WriteJSON(w, http.StatusOK, map[string]string{"message": "logged out"})
+}
+
+
 // GetSessionUser retrieves the session user using the cookie and DB connection.
 func GetSessionUser(db *sql.DB, r *http.Request) (SessionUser, error) {
 	cookie, err := r.Cookie(SessionCookieName)

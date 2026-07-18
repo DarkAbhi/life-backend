@@ -48,6 +48,7 @@ func (a *API) Router() http.Handler {
 	r.Route("/api", func(api chi.Router) {
 		api.Post("/auth/login", authHandler.Login)
 		api.Get("/auth/session", authHandler.Session)
+		api.Post("/auth/logout", authHandler.Logout)
 		api.Get("/profile", profileHandler.GetProfile)
 		api.Put("/profile", profileHandler.SaveProfile)
 		api.Get("/notifications", notifHandler.ListNotifications)

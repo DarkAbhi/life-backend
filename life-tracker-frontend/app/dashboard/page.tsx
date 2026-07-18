@@ -268,14 +268,27 @@ export default function Dashboard() {
   return (
     <main className="min-h-screen bg-background px-6 py-10 text-foreground sm:px-10 lg:px-16">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-10">
-          <p className="text-sm font-semibold tracking-[0.18em] text-primary">
-            LIFE TRACKER
-          </p>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            {greeting}, {displayName || username}.
-          </h1>
-          <p className="mt-3 text-base text-muted-foreground">{greetingNote}</p>
+        <header className="mb-10 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold tracking-[0.18em] text-primary">
+              LIFE TRACKER
+            </p>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              {greeting}, {displayName || username}.
+            </h1>
+            <p className="mt-3 text-base text-muted-foreground">{greetingNote}</p>
+          </div>
+          <Link
+            className="group shrink-0 rounded-full border border-border bg-card p-1 shadow-sm transition hover:shadow-md hover:border-primary/50"
+            href="/profile"
+            aria-label="Profile"
+          >
+            <img
+              alt="Profile placeholder"
+              className="h-12 w-12 rounded-full object-cover transition duration-200 group-hover:scale-105"
+              src="/avatar-placeholder.jpg"
+            />
+          </Link>
         </header>
 
         <section aria-labelledby="categories-heading">
