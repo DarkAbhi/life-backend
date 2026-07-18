@@ -85,44 +85,6 @@
   --chart-5: #7c6e62;             /* Coffee brown */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Dark Theme - Deep Rich Espresso Cocoa & Glowing Amber */
-    --background: #140f0c;        /* Deepest roasted espresso dark brown (never black) */
-    --foreground: #faf4eb;        /* Soft warm cream text (never pure white) */
-    
-    --card: #1e1713;              /* Warm dark chocolate card background */
-    --card-foreground: #faf4eb;   /* Warm cream text */
-    
-    --popover: #1e1713;
-    --popover-foreground: #faf4eb;
-    
-    --primary: #f59e0b;           /* Bright glowing warm amber */
-    --primary-foreground: #140f0c; /* Deep espresso contrast */
-    
-    --secondary: #451a03;         /* Deep amber-brown */
-    --secondary-foreground: #fef08a; /* Soft glowing yellow-amber */
-    
-    --muted: #2d2019;             /* Roasted coffee ground dark brown */
-    --muted-foreground: #a89485;  /* Soft latte cream-brown */
-    
-    --accent: #2d2019;            /* Roasted coffee ground */
-    --accent-foreground: #faf4eb;
-    
-    --destructive: #e11d48;       /* Warm rose/crimson red */
-    --destructive-foreground: #faf4eb;
-    
-    --border: #33241d;            /* Deep warm cocoa border */
-    --input: #453229;             /* Warm clay brown input border */
-    --ring: #f59e0b;              /* Glowing amber ring */
-    
-    --chart-1: #f59e0b;
-    --chart-2: #14b8a6;
-    --chart-3: #0ea5e9;
-    --chart-4: #6366f1;
-    --chart-5: #a89485;
-  }
-}
 
 .dark {
   /* Copy of media query dark theme for manual selector compatibility */
