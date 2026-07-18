@@ -1,20 +1,18 @@
-"use client";
-
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import Link from "next/link";
-import { SubmitEvent, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import ConfirmationDialog from "../../components/design-system/confirmation-dialog";
-import { ArrowLeft, Trash2, Plus } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import DeleteVisitButton from "./delete-visit-button";
+import AddExerciseForm from "./add-exercise-form";
+
+export const metadata = {
+  title: "Gym Visit Detail | Life Tracker",
+};
 
 const apiBaseURL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-
-type ExerciseSet = {
-  id?: number;
-  set_number?: number;
-  reps: string;
-  weight: string;
-};
+  process.env.NEXT_PUBLIC_INTERNAL_API_BASE_URL ??
+  process.env.NEXT_PUBLIC_API_BASE_URL ??
+  "http://localhost:8080";
 
 type SavedExercise = {
   id: number;
@@ -27,121 +25,48 @@ type SavedExercise = {
   }>;
 };
 
-function newSet(): ExerciseSet {
-  return { reps: "", weight: "" };
+interface PageProps {
+  params: Promise<{ id: string }>;
 }
 
-export default function GymVisit() {
-  const params = useParams<{ id: string }>();
-  const router = useRouter();
-  const visitID = params.id;
-  const [exercises, setExercises] = useState<SavedExercise[]>([]);
-  const [exerciseName, setExerciseName] = useState("");
-  const [sets, setSets] = useState<ExerciseSet[]>([newSet()]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const [error, setError] = useState("");
+export default async function GymVisitPage({ params }: PageProps) {
+  const { id: visitID } = await params;
 
-  useEffect(() => {
-    async function loadVisit() {
-      try {
-        const sessionResponse = await fetch(`${apiBaseURL}/api/auth/session`, {
-          credentials: "include",
-        });
-        if (!sessionResponse.ok) {
-          router.replace("/");
-          return;
-        }
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
 
-        const response = await fetch(
-          `${apiBaseURL}/api/gym-visits/${visitID}/exercises`,
-          {
-            credentials: "include",
-          },
-        );
-        if (response.status === 404) {
-          router.replace("/dashboard");
-          return;
-        }
-        if (!response.ok) {
-          setError("We couldn't load this gym visit. Please try again.");
-          return;
-        }
-        setExercises((await response.json()) as SavedExercise[]);
-      } catch {
-        setError("We couldn't reach the server. Please try again.");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void loadVisit();
-  }, [router, visitID]);
-
-  function updateSet(index: number, field: keyof ExerciseSet, value: string) {
-    setSets((currentSets) =>
-      currentSets.map((set, setIndex) =>
-        setIndex === index ? { ...set, [field]: value } : set,
-      ),
-    );
+  // Validate session on the server
+  const sessionResponse = await fetch(`${apiBaseURL}/api/auth/session`, {
+    headers: {
+      Cookie: cookieHeader,
+    },
+  });
+  if (!sessionResponse.ok) {
+    redirect("/");
   }
 
-  async function saveExercise(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    setIsSaving(true);
+  let exercises: SavedExercise[] = [];
+  let error = "";
 
-    const payloadSets = sets.map((set) => ({
-      reps: Number(set.reps),
-      weight: set.weight === "" ? null : Number(set.weight),
-    }));
-    try {
-      const response = await fetch(
-        `${apiBaseURL}/api/gym-visits/${visitID}/exercises`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: exerciseName, sets: payloadSets }),
+  try {
+    const response = await fetch(
+      `${apiBaseURL}/api/gym-visits/${visitID}/exercises`,
+      {
+        headers: {
+          Cookie: cookieHeader,
         },
-      );
-      const body = (await response.json()) as SavedExercise & {
-        error?: string;
-      };
-      if (!response.ok) {
-        setError(body.error ?? "We couldn't save that exercise.");
-        return;
       }
-      setExercises((currentExercises) => [...currentExercises, body]);
-      setExerciseName("");
-      setSets([newSet()]);
-    } catch {
-      setError("We couldn't reach the server. Please try again.");
-    } finally {
-      setIsSaving(false);
+    );
+    if (response.status === 404) {
+      redirect("/dashboard");
     }
-  }
-
-  async function deleteVisit() {
-    setError("");
-    setIsDeleting(true);
-    try {
-      const response = await fetch(`${apiBaseURL}/api/gym-visits/${visitID}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!response.ok) {
-        setError("We couldn't delete this gym visit. Please try again.");
-        return;
-      }
-      router.replace("/gym-visits");
-    } catch {
-      setError("We couldn't reach the server. Please try again.");
-    } finally {
-      setIsDeleting(false);
+    if (!response.ok) {
+      error = "We couldn't load this gym visit. Please try again.";
+    } else {
+      exercises = (await response.json()) as SavedExercise[];
     }
+  } catch {
+    error = "We couldn't reach the server. Please try again.";
   }
 
   return (
@@ -150,21 +75,15 @@ export default function GymVisit() {
         <section>
           <div className="flex items-start justify-between gap-4">
             <Link
-              className="flex items-center gap-1 text-sm font-semibold text-primary transition hover:opacity-80"
+              className="flex items-center gap-1 text-sm font-semibold text-primary transition hover:opacity-80 w-fit"
               href="/dashboard"
             >
               <ArrowLeft className="h-4 w-4" /> Dashboard
             </Link>
-            <button
-              className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold text-destructive transition hover:bg-destructive/10"
-              onClick={() => setIsConfirmingDelete(true)}
-              type="button"
-            >
-              <Trash2 className="h-4 w-4" /> Delete visit
-            </button>
+            <DeleteVisitButton visitID={visitID} />
           </div>
-          <p className="mt-5 text-sm font-semibold tracking-[0.18em] text-primary">
-            GYM VISIT
+          <p className="mt-5 text-sm font-semibold tracking-[0.18em] text-primary uppercase">
+            Gym Visit
           </p>
           <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             Today&apos;s workout
@@ -174,8 +93,10 @@ export default function GymVisit() {
           </p>
 
           <div className="mt-8 space-y-4">
-            {isLoading ? (
-              <p className="text-muted-foreground">Loading exercises…</p>
+            {error ? (
+              <p className="rounded-xl bg-destructive/10 p-4 text-sm text-destructive" role="alert">
+                {error}
+              </p>
             ) : exercises.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border bg-card p-8">
                 <p className="font-semibold text-foreground">
@@ -227,109 +148,8 @@ export default function GymVisit() {
           </div>
         </section>
 
-        <aside className="h-fit rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
-          <h2 className="text-xl font-semibold text-foreground">
-            Add an exercise
-          </h2>
-          <form className="mt-6 space-y-5" onSubmit={saveExercise}>
-            <div>
-              <label
-                className="mb-2 block text-sm font-medium text-muted-foreground"
-                htmlFor="exercise-name"
-              >
-                Workout name
-              </label>
-              <input
-                className="w-full rounded-lg border border-border bg-background text-foreground px-4 py-3 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
-                id="exercise-name"
-                maxLength={100}
-                onChange={(event) => setExerciseName(event.target.value)}
-                placeholder="e.g. Barbell squat"
-                required
-                value={exerciseName}
-              />
-            </div>
-
-            <fieldset className="space-y-3">
-              <legend className="text-sm font-medium text-muted-foreground">
-                Sets
-              </legend>
-              {sets.map((set, index) => (
-                <div
-                  className="grid grid-cols-[auto_1fr_1fr] items-end gap-2"
-                  key={index}
-                >
-                  <span className="pb-3 text-sm font-semibold text-muted-foreground">
-                    {index + 1}
-                  </span>
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Reps
-                    <input
-                      className="mt-1 w-full rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-                      min="1"
-                      onChange={(event) =>
-                        updateSet(index, "reps", event.target.value)
-                      }
-                      required
-                      type="number"
-                      value={set.reps}
-                    />
-                  </label>
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Weight (kg)
-                    <input
-                      className="mt-1 w-full rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-                      min="0"
-                      onChange={(event) =>
-                        updateSet(index, "weight", event.target.value)
-                      }
-                      placeholder="Optional"
-                      step="0.5"
-                      type="number"
-                      value={set.weight}
-                    />
-                  </label>
-                </div>
-              ))}
-              <button
-                className="flex items-center gap-1 text-sm font-semibold text-primary transition hover:opacity-80"
-                onClick={() =>
-                  setSets((currentSets) => [...currentSets, newSet()])
-                }
-                type="button"
-              >
-                <Plus className="h-4 w-4" /> Add another set
-              </button>
-            </fieldset>
-
-            {error && (
-              <p className="text-sm text-destructive" role="alert">
-                {error}
-              </p>
-            )}
-            <button
-              className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
-              disabled={isSaving}
-              type="submit"
-            >
-              {isSaving ? "Saving exercise…" : "Save exercise"}
-            </button>
-          </form>
-        </aside>
+        <AddExerciseForm visitID={visitID} />
       </div>
-
-      <ConfirmationDialog
-        isOpen={isConfirmingDelete}
-        onClose={() => setIsConfirmingDelete(false)}
-        onConfirm={() => void deleteVisit()}
-        title="Delete this gym visit?"
-        description="This permanently removes the visit and every exercise and set saved with it."
-        confirmText="Delete visit"
-        confirmLoadingText="Deleting…"
-        isLoading={isDeleting}
-        error={error}
-        variant="destructive"
-      />
     </main>
   );
 }
