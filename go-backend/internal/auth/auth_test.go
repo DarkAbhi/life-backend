@@ -1,14 +1,150 @@
 package auth
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/DarkAbhi/life-backend/internal/testhelper"
 )
 
 func TestBootstrapPasswordHash(t *testing.T) {
 	const bootstrapHash = "$2y$12$bB7WwVq7nGJ4cfNTCX6kQODcNRLQvMjRhIFuH4Qv2.GAxlqNac4/S"
 	if err := bcrypt.CompareHashAndPassword([]byte(bootstrapHash), []byte("password")); err != nil {
 		t.Fatalf("bootstrap password hash does not match the documented password: %v", err)
+	}
+}
+
+func TestLoginAndSession(t *testing.T) {
+	db, shutdown := testhelper.StartPostgres(t)
+	defer shutdown()
+
+	h := NewHandler(db)
+
+	// 1. Test Login - Missing fields
+	{
+		rec := httptest.NewRecorder()
+		body, _ := json.Marshal(loginBody{Username: "", Password: ""})
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(body))
+		h.Login(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected 400 Bad Request, got %d", rec.Code)
+		}
+	}
+
+	// 2. Test Login - Invalid credentials
+	{
+		rec := httptest.NewRecorder()
+		body, _ := json.Marshal(loginBody{Username: "admin", Password: "wrongpassword"})
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(body))
+		h.Login(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected 401 Unauthorized, got %d", rec.Code)
+		}
+	}
+
+	// 3. Test Login - Success
+	var sessionCookie *http.Cookie
+	{
+		rec := httptest.NewRecorder()
+		body, _ := json.Marshal(loginBody{Username: "admin", Password: "password"})
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(body))
+		h.Login(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200 OK, got %d", rec.Code)
+		}
+
+		cookies := rec.Result().Cookies()
+		for _, cookie := range cookies {
+			if cookie.Name == SessionCookieName {
+				sessionCookie = cookie
+				break
+			}
+		}
+		if sessionCookie == nil {
+			t.Fatal("expected session cookie in response, got none")
+		}
+	}
+
+	// 4. Test Session - Unauthorized
+	{
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/auth/session", nil)
+		h.Session(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected 401 Unauthorized for session, got %d", rec.Code)
+		}
+	}
+
+	// 5. Test Session - Success (with cookie)
+	{
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/auth/session", nil)
+		req.AddCookie(sessionCookie)
+		h.Session(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200 OK for session, got %d", rec.Code)
+		}
+
+		var out map[string]string
+		_ = json.NewDecoder(rec.Body).Decode(&out)
+		if out["username"] != "admin" {
+			t.Errorf("expected username admin, got %q", out["username"])
+		}
+	}
+
+	// 6. Test GetSessionUser directly
+	{
+		req := httptest.NewRequest(http.MethodGet, "/auth/session", nil)
+		req.AddCookie(sessionCookie)
+		user, err := GetSessionUser(db, req)
+		if err != nil {
+			t.Fatalf("expected GetSessionUser to succeed, got %v", err)
+		}
+		if user.Username != "admin" {
+			t.Errorf("expected username admin, got %q", user.Username)
+		}
+		if user.ID <= 0 {
+			t.Errorf("expected positive user ID, got %d", user.ID)
+		}
+	}
+}
+
+func TestGetSessionUserExpired(t *testing.T) {
+	db, shutdown := testhelper.StartPostgres(t)
+	defer shutdown()
+
+	// Insert an expired session manually
+	token := "expiredtokenvalue12345"
+	hash := sha256.Sum256([]byte(token))
+	hashStr := hex.EncodeToString(hash[:])
+	expiredAt := time.Now().Add(-1 * time.Hour)
+
+	_, err := db.Exec(`
+		INSERT INTO user_sessions (user_id, token_hash, expires_at)
+		VALUES (1, $1, $2)
+	`, hashStr, expiredAt)
+	if err != nil {
+		t.Fatalf("failed to insert expired session: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  SessionCookieName,
+		Value: token,
+	})
+
+	_, err = GetSessionUser(db, req)
+	if err == nil {
+		t.Fatal("expected GetSessionUser to fail for expired token, but got nil error")
 	}
 }

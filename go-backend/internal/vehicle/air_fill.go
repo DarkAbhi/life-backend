@@ -164,7 +164,7 @@ func createAirFillReminder(database *sql.DB, airFillID int64) error {
 	var notificationID int64
 	err = tx.QueryRow(`
 		INSERT INTO notifications (user_id, source, title, body, target_path, priority, metadata)
-		VALUES ($1, 'Garage', $2, $3, '/garage', 1, jsonb_build_object('vehicle_id', $4))
+		VALUES ($1, 'Garage', $2, $3, '/garage', 1, jsonb_build_object('vehicle_id', $4::bigint))
 		RETURNING id
 	`, userID, "Time to check "+vehicleName+"'s air", "It has been 30 days since you last filled air in "+vehicleName+".", vehicleID).Scan(&notificationID)
 	if err != nil {
