@@ -1,11 +1,11 @@
 import os
 
-BASE_URL = os.environ.get("BACKEND_BASE_URL")
+BASE_URL = os.environ.get("BACKEND_BASE_URL", "").rstrip("/")
 
-ADD_WORKOUT_ENDPOINT = "workout/add-workout/"
-ADD_MEDITATION_ENDPOINT = "meditation/add-meditation/"
-ADD_SPORT_ENDPOINT = "sport/add-sport/"
+ADD_WORKOUT_ENDPOINT = "/api/workout/today"
+ADD_MEDITATION_ENDPOINT = "/api/meditation/today"
+ADD_SPORT_ENDPOINT = "/api/sport/today"
 
-TRANSACTION_ENDPOINT = "transaction/"
+TRANSACTION_ENDPOINT = "/api/transactions/"
 
-GET_ALL_VEHICLES_ENDPOINT = "vehicle/"
+GET_ALL_VEHICLES_ENDPOINT = "/api/vehicles"
