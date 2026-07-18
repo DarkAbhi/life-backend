@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { deleteAirFill, deleteFuelFill } from "./actions";
-import ConfirmationDialog from "../../components/confirmation-dialog";
+import ConfirmationDialog from "../../components/design-system/confirmation-dialog";
 
 interface DeleteButtonProps {
   vehicleId: string;
@@ -10,7 +10,11 @@ interface DeleteButtonProps {
   kind: "air-fills" | "fuel-fillups";
 }
 
-export default function DeleteButton({ vehicleId, recordId, kind }: DeleteButtonProps) {
+export default function DeleteButton({
+  vehicleId,
+  recordId,
+  kind,
+}: DeleteButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [toastError, setToastError] = useState("");
   const [isPending, startTransition] = useTransition();
