@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { deleteAirFill, deleteFuelFill } from "./actions";
+import ConfirmationDialog from "../../components/confirmation-dialog";
 
 interface DeleteButtonProps {
   vehicleId: string;
@@ -44,46 +45,17 @@ export default function DeleteButton({ vehicleId, recordId, kind }: DeleteButton
         Delete
       </button>
 
-      {/* Confirmation Modal */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 px-6"
-          role="dialog"
-          aria-labelledby="delete-confirmation-title"
-          aria-modal="true"
-        >
-          <section className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
-            <h2
-              className="text-2xl font-bold tracking-tight text-stone-900"
-              id="delete-confirmation-title"
-            >
-              Delete this record?
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
-              This will permanently remove this record from your history. This
-              cannot be undone.
-            </p>
-            <div className="mt-6 flex gap-3">
-              <button
-                className="flex-1 rounded-lg border border-stone-300 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
-                disabled={isPending}
-                onClick={() => setIsOpen(false)}
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                className="flex-1 rounded-lg bg-red-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-red-300"
-                disabled={isPending}
-                onClick={handleClear}
-                type="button"
-              >
-                {isPending ? "Deleting…" : "Yes, delete"}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+      <ConfirmationDialog
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        onConfirm={handleClear}
+        title="Delete this record?"
+        description="This will permanently remove this record from your history. This cannot be undone."
+        confirmText="Yes, delete"
+        confirmLoadingText="Deleting…"
+        isLoading={isPending}
+        variant="destructive"
+      />
 
       {/* Error Toast Notification */}
       {toastError && (

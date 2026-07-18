@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { SubmitEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import ConfirmationDialog from "../../components/confirmation-dialog";
 
 const apiBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
@@ -256,35 +257,18 @@ export default function GymVisit() {
         </aside>
       </div>
 
-      {isConfirmingDelete && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-stone-950/40 px-6" role="dialog" aria-labelledby="delete-gym-visit-title" aria-modal="true">
-          <section className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
-            <h2 className="text-2xl font-bold tracking-tight text-stone-900" id="delete-gym-visit-title">Delete this gym visit?</h2>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
-              This permanently removes the visit and every exercise and set saved with it.
-            </p>
-            {error && <p className="mt-3 text-sm text-red-600" role="alert">{error}</p>}
-            <div className="mt-6 flex gap-3">
-              <button
-                className="flex-1 rounded-lg border border-stone-300 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
-                disabled={isDeleting}
-                onClick={() => setIsConfirmingDelete(false)}
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                className="flex-1 rounded-lg bg-red-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-red-300"
-                disabled={isDeleting}
-                onClick={() => void deleteVisit()}
-                type="button"
-              >
-                {isDeleting ? "Deleting…" : "Delete visit"}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+      <ConfirmationDialog
+        isOpen={isConfirmingDelete}
+        onClose={() => setIsConfirmingDelete(false)}
+        onConfirm={() => void deleteVisit()}
+        title="Delete this gym visit?"
+        description="This permanently removes the visit and every exercise and set saved with it."
+        confirmText="Delete visit"
+        confirmLoadingText="Deleting…"
+        isLoading={isDeleting}
+        error={error}
+        variant="destructive"
+      />
     </main>
   );
 }

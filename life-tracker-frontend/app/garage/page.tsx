@@ -4,6 +4,7 @@ import Link from "next/link";
 import { SubmitEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FuelForm, FuelFormItem } from "../components/fuel-form";
+import ConfirmationDialog from "../components/confirmation-dialog";
 
 const apiBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
@@ -260,35 +261,18 @@ export default function Garage() {
         </div>
       )}
 
-      {pendingAirFillVehicle && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-stone-950/40 px-6" role="dialog" aria-labelledby="air-fill-title" aria-modal="true">
-          <section className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
-            <h2 className="text-2xl font-bold tracking-tight text-stone-900" id="air-fill-title">Mark air filled?</h2>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
-              Record that you filled air in {pendingAirFillVehicle.name} right now. We&apos;ll remind you again in 30 days.
-            </p>
-            {airFillError && <p className="mt-3 text-sm text-red-600" role="alert">{airFillError}</p>}
-            <div className="mt-6 flex gap-3">
-              <button
-                className="flex-1 rounded-lg border border-stone-300 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
-                disabled={isMarkingAirFill}
-                onClick={() => setPendingAirFillVehicle(null)}
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                className="flex-1 rounded-lg bg-amber-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-amber-300"
-                disabled={isMarkingAirFill}
-                onClick={() => void markAirFill()}
-                type="button"
-              >
-                {isMarkingAirFill ? "Marking…" : "Yes, mark air filled"}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+      <ConfirmationDialog
+        isOpen={!!pendingAirFillVehicle}
+        onClose={() => setPendingAirFillVehicle(null)}
+        onConfirm={() => void markAirFill()}
+        title="Mark air filled?"
+        description={pendingAirFillVehicle ? `Record that you filled air in ${pendingAirFillVehicle.name} right now. We'll remind you again in 30 days.` : ""}
+        confirmText="Yes, mark air filled"
+        confirmLoadingText="Marking…"
+        isLoading={isMarkingAirFill}
+        error={airFillError}
+        variant="amber"
+      />
 
       {fuelVehicle && (
         <div className="fixed inset-0 z-10 overflow-y-auto bg-stone-950/40 px-6 py-8" role="dialog" aria-labelledby="fuel-title" aria-modal="true">

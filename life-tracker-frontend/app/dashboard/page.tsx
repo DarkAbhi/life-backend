@@ -4,6 +4,7 @@ import { SubmitEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppNotification, NotificationList } from "../components/notification-list";
+import ConfirmationDialog from "../components/confirmation-dialog";
 
 const apiBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
@@ -358,38 +359,21 @@ export default function Dashboard() {
         </div>
       )}
 
-      {isConfirmingAnotherVisit && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-stone-950/40 px-6" role="dialog" aria-labelledby="another-gym-visit-title" aria-modal="true">
-          <section className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
-            <h2 className="text-2xl font-bold tracking-tight text-stone-900" id="another-gym-visit-title">Mark another gym visit?</h2>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
-              This will create a separate visit for today, with its own exercise log.
-            </p>
-            <div className="mt-6 flex gap-3">
-              <button
-                className="flex-1 rounded-lg border border-stone-300 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
-                disabled={isMarkingGym}
-                onClick={() => setIsConfirmingAnotherVisit(false)}
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                className="flex-1 rounded-lg bg-emerald-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-300"
-                disabled={isMarkingGym}
-                onClick={async () => {
-                  if (await markGymVisit()) {
-                    setIsConfirmingAnotherVisit(false);
-                  }
-                }}
-                type="button"
-              >
-                {isMarkingGym ? "Marking…" : "Yes, mark visit"}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+      <ConfirmationDialog
+        isOpen={isConfirmingAnotherVisit}
+        onClose={() => setIsConfirmingAnotherVisit(false)}
+        onConfirm={async () => {
+          if (await markGymVisit()) {
+            setIsConfirmingAnotherVisit(false);
+          }
+        }}
+        title="Mark another gym visit?"
+        description="This will create a separate visit for today, with its own exercise log."
+        confirmText="Yes, mark visit"
+        confirmLoadingText="Marking…"
+        isLoading={isMarkingGym}
+        variant="positive"
+      />
     </main>
   );
 }
