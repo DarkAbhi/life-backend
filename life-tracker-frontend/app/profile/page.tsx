@@ -1,143 +1,53 @@
-"use client";
-
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, LogOut, Sun, Moon, Monitor } from "lucide-react";
-import ConfirmationDialog from "../components/design-system/confirmation-dialog";
+import { ArrowLeft } from "lucide-react";
+import ThemeSettings from "./theme-settings";
+import LogoutButton from "./logout-button";
 
-const apiBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+export const metadata = {
+  title: "Profile | Life Tracker",
+};
+
+const apiBaseURL =
+  process.env.NEXT_PUBLIC_INTERNAL_API_BASE_URL ??
+  process.env.NEXT_PUBLIC_API_BASE_URL ??
+  "http://localhost:8080";
 
 type ProfileResponse = {
   has_profile: boolean;
   name?: string;
 };
 
-export default function ProfilePage() {
-  const router = useRouter();
-  const [username, setUsername] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+export default async function ProfilePage() {
+  // Forward cookies from incoming request to backend for auth/session validation
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
 
-  const [isConfirmingLogout, setIsConfirmingLogout] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [logoutError, setLogoutError] = useState("");
-
-  const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
-
-  useEffect(() => {
-    const savedTheme = (localStorage.getItem("theme") as "light" | "dark" | "system") || "system";
-    setTheme(savedTheme);
-  }, []);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = () => {
-      const savedTheme = localStorage.getItem("theme") || "system";
-      if (savedTheme === "system") {
-        if (mediaQuery.matches) {
-          document.documentElement.classList.add("dark");
-        } else {
-          document.documentElement.classList.remove("dark");
-        }
-      }
-    };
-    
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
-
-  const changeTheme = (newTheme: "light" | "dark" | "system") => {
-    setTheme(newTheme);
-    localStorage.setItem("theme", newTheme);
-    
-    if (newTheme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else if (newTheme === "light") {
-      document.documentElement.classList.remove("dark");
-    } else {
-      if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    }
-  };
-
-  useEffect(() => {
-    document.title = "Profile | Life Tracker";
-
-    async function loadProfile() {
-      try {
-        const sessionResponse = await fetch(`${apiBaseURL}/api/auth/session`, {
-          credentials: "include",
-        });
-        if (!sessionResponse.ok) {
-          router.replace("/");
-          return;
-        }
-        const session = (await sessionResponse.json()) as { username: string };
-
-        const profileResponse = await fetch(`${apiBaseURL}/api/profile`, {
-          credentials: "include",
-        });
-        if (!profileResponse.ok) {
-          router.replace("/");
-          return;
-        }
-        const profile = (await profileResponse.json()) as ProfileResponse;
-        setUsername(session.username);
-        setDisplayName(profile.name ?? "");
-      } catch {
-        router.replace("/");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void loadProfile();
-  }, [router]);
-
-  async function handleLogout() {
-    setLogoutError("");
-    setIsLoggingOut(true);
-    try {
-      const response = await fetch(`${apiBaseURL}/api/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!response.ok) {
-        setLogoutError("Failed to sign out. Please try again.");
-        return;
-      }
-
-      // Clear document cookies (in case there are any non-HttpOnly client cookies)
-      document.cookie.split(";").forEach((cookie) => {
-        const eqPos = cookie.indexOf("=");
-        const name = eqPos > -1 ? cookie.substring(0, eqPos) : cookie;
-        document.cookie = name.trim() + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
-      });
-
-      // Clear storage
-      localStorage.clear();
-      sessionStorage.clear();
-
-      setIsConfirmingLogout(false);
-      router.replace("/");
-    } catch {
-      setLogoutError("Unable to reach the server. Please try again.");
-    } finally {
-      setIsLoggingOut(false);
-    }
+  // Validate session on the server
+  const sessionResponse = await fetch(`${apiBaseURL}/api/auth/session`, {
+    headers: {
+      Cookie: cookieHeader,
+    },
+  });
+  if (!sessionResponse.ok) {
+    redirect("/");
   }
+  const session = (await sessionResponse.json()) as { username: string };
 
-  if (isLoading || !username) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-        Loading profile…
-      </main>
-    );
+  // Fetch profile on the server
+  const profileResponse = await fetch(`${apiBaseURL}/api/profile`, {
+    headers: {
+      Cookie: cookieHeader,
+    },
+  });
+  if (!profileResponse.ok) {
+    redirect("/");
   }
+  const profile = (await profileResponse.json()) as ProfileResponse;
+
+  const username = session.username;
+  const displayName = profile.name ?? "";
 
   return (
     <main className="min-h-screen bg-background px-6 py-10 text-foreground sm:px-10 lg:px-16">
@@ -182,82 +92,11 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="mt-6 w-full rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8 text-left">
-            <h2 className="text-lg font-semibold text-foreground mb-1">Theme Settings</h2>
-            <p className="text-xs text-muted-foreground mb-6">
-              Choose how Life Tracker looks on your device.
-            </p>
-            <div className="grid grid-cols-3 gap-3">
-              <button
-                type="button"
-                onClick={() => changeTheme("light")}
-                className={`flex flex-col items-center justify-center gap-2 rounded-xl border p-4 text-sm font-semibold transition cursor-pointer ${
-                  theme === "light"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                <Sun className="h-5 w-5" />
-                <span>Light</span>
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => changeTheme("dark")}
-                className={`flex flex-col items-center justify-center gap-2 rounded-xl border p-4 text-sm font-semibold transition cursor-pointer ${
-                  theme === "dark"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                <Moon className="h-5 w-5" />
-                <span>Dark</span>
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => changeTheme("system")}
-                className={`flex flex-col items-center justify-center gap-2 rounded-xl border p-4 text-sm font-semibold transition cursor-pointer ${
-                  theme === "system"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                <Monitor className="h-5 w-5" />
-                <span>System</span>
-              </button>
-            </div>
-          </div>
+          <ThemeSettings />
 
-          {/* Logout Button below all details */}
-          <div className="mt-6 w-full">
-            <button
-              className="flex items-center justify-center gap-2 w-full rounded-lg border border-destructive/30 bg-transparent px-4 py-3 text-sm font-semibold text-destructive transition hover:bg-destructive/10 focus:outline-none focus:ring-4 focus:ring-destructive/20 cursor-pointer"
-              onClick={() => {
-                setLogoutError("");
-                setIsConfirmingLogout(true);
-              }}
-              type="button"
-            >
-              <LogOut className="h-4 w-4" />
-              <span>Sign out</span>
-            </button>
-          </div>
+          <LogoutButton />
         </section>
       </div>
-
-      <ConfirmationDialog
-        isOpen={isConfirmingLogout}
-        onClose={() => setIsConfirmingLogout(false)}
-        onConfirm={handleLogout}
-        title="Sign out of your account?"
-        description="You will need to sign in again to access your dashboard and spaces."
-        confirmText="Sign out"
-        confirmLoadingText="Signing out…"
-        isLoading={isLoggingOut}
-        error={logoutError}
-        variant="destructive"
-      />
     </main>
   );
 }
