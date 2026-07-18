@@ -2,14 +2,12 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import VehicleClientPage from "./vehicle-client";
 
+import { AirFill, FuelFill } from "./types";
+
 const apiBaseURL =
   process.env.NEXT_PUBLIC_INTERNAL_API_BASE_URL ??
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   "http://localhost:8080";
-
-type AirFill = { id: number; filled_at: string };
-type FuelItem = { fuel_type: string; fill_type: string; quantity: number; unit_price: number; total_cost: number };
-type FuelFill = { id: number; odometer_km: number; filled_at: string; station_name: string | null; notes: string | null; items: FuelItem[] };
 
 interface PageProps {
   params: Promise<{ id: string }>;

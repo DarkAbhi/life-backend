@@ -1,37 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { SubmitEvent, useState } from "react";
+import { SubmitEvent, useState, useTransition } from "react";
 import { FuelForm, FuelFormItem } from "../../components/fuel-form";
-
-const apiBaseURL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-
-type AirFill = { id: number; filled_at: string };
-type FuelItem = {
-  fuel_type: string;
-  fill_type: string;
-  quantity: number;
-  unit_price: number;
-  total_cost: number;
-};
-type FuelFill = {
-  id: number;
-  odometer_km: number;
-  filled_at: string;
-  station_name: string | null;
-  notes: string | null;
-  items: FuelItem[];
-};
+import { AirFill, FuelFill, FuelItem } from "./types";
+import { deleteAirFill, deleteFuelFill, saveFuelFill } from "./actions";
 
 const formatter = new Intl.DateTimeFormat("en-IN", {
   dateStyle: "medium",
   timeStyle: "short",
 });
+
 const toLocal = (value: string) =>
   new Date(new Date(value).getTime() - new Date().getTimezoneOffset() * 60000)
     .toISOString()
     .slice(0, 16);
+
 const toFormItem = (item: FuelItem): FuelFormItem => ({
   fuelType: item.fuel_type,
   fillType: item.fill_type,
@@ -53,10 +37,8 @@ export default function VehicleClientPage({
   initialAirFills,
   initialFuelFills,
 }: VehicleClientPageProps) {
-  const [airFills, setAirFills] = useState<AirFill[]>(initialAirFills);
-  const [fuelFills, setFuelFills] = useState<FuelFill[]>(initialFuelFills);
   const [editing, setEditing] = useState<FuelFill | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [odometer, setOdometer] = useState("");
   const [filledAt, setFilledAt] = useState("");
@@ -76,25 +58,26 @@ export default function VehicleClientPage({
 
   async function remove(kind: "air-fills" | "fuel-fillups", recordID: number) {
     if (!window.confirm("Delete this record? This cannot be undone.")) return;
-    const response = await fetch(
-      `${apiBaseURL}/api/vehicles/${id}/${kind}/${recordID}`,
-      { method: "DELETE", credentials: "include" },
-    );
-    if (!response.ok) {
-      setError("We couldn't delete that record.");
-      return;
-    }
-    if (kind === "air-fills")
-      setAirFills((current) => current.filter((item) => item.id !== recordID));
-    else
-      setFuelFills((current) => current.filter((item) => item.id !== recordID));
+    setError("");
+    startTransition(async () => {
+      const action = kind === "air-fills" ? deleteAirFill : deleteFuelFill;
+      const res = await action(id, recordID);
+      if (!res.ok) {
+        setError(res.error ?? "We couldn't delete that record.");
+      }
+      /*
+       * NOTE: [useOptimistic] could later be added here to instantly filter out
+       * the deleted record from the UI list (initialAirFills/initialFuelFills)
+       * before the Server Action revalidation completes on the backend.
+       */
+    });
   }
 
   async function saveEdit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editing) return;
     setError("");
-    setSaving(true);
+    
     const optional = (value: string) => (value === "" ? null : Number(value));
     const payload = {
       odometer_km: Number(odometer),
@@ -109,43 +92,20 @@ export default function VehicleClientPage({
         total_cost: optional(item.totalCost),
       })),
     };
-    try {
-      const response = await fetch(
-        `${apiBaseURL}/api/vehicles/${id}/fuel-fillups/${editing.id}`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        },
-      );
-      const body = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        setError(body.error ?? "We couldn't save this fuel entry.");
+
+    startTransition(async () => {
+      const res = await saveFuelFill(id, editing.id, payload);
+      if (!res.ok) {
+        setError(res.error ?? "We couldn't save this fuel entry.");
         return;
       }
-      setFuelFills((current) =>
-        current.map((fill) =>
-          fill.id === editing.id
-            ? {
-                ...fill,
-                ...payload,
-                items: payload.items.map((item) => ({
-                  ...item,
-                  quantity: item.quantity ?? 0,
-                  unit_price: item.unit_price ?? 0,
-                  total_cost: item.total_cost ?? 0,
-                })),
-              }
-            : fill,
-        ),
-      );
+      /*
+       * NOTE: [useOptimistic] could later be added here to instantly swap
+       * the updated fuel fill-up inside the list before the server revalidation
+       * finishes fetching new props.
+       */
       setEditing(null);
-    } catch {
-      setError("We couldn't reach the server.");
-    } finally {
-      setSaving(false);
-    }
+    });
   }
 
   return (
@@ -167,10 +127,10 @@ export default function VehicleClientPage({
           <section>
             <h2 className="text-xl font-semibold">Fuel fill-ups</h2>
             <div className="mt-4 space-y-3">
-              {fuelFills.length === 0 ? (
+              {initialFuelFills.length === 0 ? (
                 <p className="text-sm text-stone-600">No fuel entries yet.</p>
               ) : (
-                fuelFills.map((fill) => (
+                initialFuelFills.map((fill) => (
                   <article
                     className="rounded-2xl bg-white p-5 shadow-sm"
                     key={fill.id}
@@ -185,6 +145,7 @@ export default function VehicleClientPage({
                           className="text-sm font-semibold text-amber-800"
                           onClick={() => openEdit(fill)}
                           type="button"
+                          disabled={isPending}
                         >
                           Edit
                         </button>
@@ -192,6 +153,7 @@ export default function VehicleClientPage({
                           className="text-sm font-semibold text-red-700"
                           onClick={() => void remove("fuel-fillups", fill.id)}
                           type="button"
+                          disabled={isPending}
                         >
                           Delete
                         </button>
@@ -216,7 +178,7 @@ export default function VehicleClientPage({
           <section>
             <h2 className="text-xl font-semibold">Air fills</h2>
             <div className="mt-4 space-y-3">
-              {airFills.map((fill) => (
+              {initialAirFills.map((fill) => (
                 <article
                   className="flex justify-between gap-3 rounded-2xl bg-white p-5 shadow-sm"
                   key={fill.id}
@@ -228,6 +190,7 @@ export default function VehicleClientPage({
                     className="text-sm font-semibold text-red-700"
                     onClick={() => void remove("air-fills", fill.id)}
                     type="button"
+                    disabled={isPending}
                   >
                     Delete
                   </button>
@@ -258,7 +221,7 @@ export default function VehicleClientPage({
             <FuelForm
               error={error}
               filledAt={filledAt}
-              isSaving={saving}
+              isSaving={isPending}
               items={items}
               notes={notes}
               odometer={odometer}
