@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition } from "react";
 import { deleteAirFill, deleteFuelFill } from "./actions";
 import ConfirmationDialog from "../../components/design-system/confirmation-dialog";
+import { Trash2 } from "lucide-react";
 
 interface DeleteButtonProps {
   vehicleId: string;
@@ -42,11 +43,11 @@ export default function DeleteButton({
   return (
     <>
       <button
-        className="text-sm font-semibold text-destructive disabled:opacity-50"
+        className="flex items-center gap-1 text-sm font-semibold text-destructive disabled:opacity-50 transition hover:opacity-80"
         onClick={() => setIsOpen(true)}
         type="button"
       >
-        Delete
+        <Trash2 className="h-4 w-4" /> Delete
       </button>
 
       <ConfirmationDialog

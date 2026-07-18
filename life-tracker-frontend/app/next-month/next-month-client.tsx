@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { deletePurchase, clearAllPurchases } from "./actions";
 import ConfirmationDialog from "../components/design-system/confirmation-dialog";
+import { ArrowLeft, Trash2, ExternalLink } from "lucide-react";
 
 type Item = { id: number; name: string; price: number; url: string | null };
 
@@ -71,8 +72,8 @@ export default function NextMonthClient({
   return (
     <main className="min-h-screen bg-background px-6 py-10 text-foreground sm:px-10">
       <div className="mx-auto max-w-3xl">
-        <Link className="text-sm font-semibold text-primary" href="/dashboard">
-          ← Dashboard
+        <Link className="flex items-center gap-1 text-sm font-semibold text-primary w-fit" href="/dashboard">
+          <ArrowLeft className="h-4 w-4" /> Dashboard
         </Link>
         <header className="mt-6 flex items-start justify-between gap-4">
           <div>
@@ -85,7 +86,7 @@ export default function NextMonthClient({
             </p>
           </div>
           <button
-            className="shrink-0 rounded-lg border border-destructive px-4 py-3 text-sm font-semibold text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+            className="shrink-0 flex items-center gap-1.5 rounded-lg border border-destructive px-4 py-3 text-sm font-semibold text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isMutationLoading || items.length === 0}
             onClick={() => {
               setError("");
@@ -93,7 +94,8 @@ export default function NextMonthClient({
             }}
             type="button"
           >
-            {isClearing ? "Clearing…" : "Clear all"}
+            <Trash2 className="h-4 w-4" />
+            <span>{isClearing ? "Clearing…" : "Clear all"}</span>
           </button>
         </header>
 
@@ -119,19 +121,20 @@ export default function NextMonthClient({
                   <h2 className="font-semibold text-foreground">{item.name}</h2>
                   {item.url && (
                     <a
-                      className="mt-1 block text-sm text-primary underline"
+                      className="mt-1 flex items-center gap-1 text-sm text-primary hover:opacity-80 w-fit"
                       href={item.url}
                       rel="noreferrer"
                       target="_blank"
                     >
-                      Open link
+                      <span>Open link</span>
+                      <ExternalLink className="h-3.5 w-3.5" />
                     </a>
                   )}
                 </div>
                 <div className="flex items-center gap-4">
                   <strong className="text-foreground">₹{item.price.toFixed(2)}</strong>
                   <button
-                    className="rounded-lg border border-destructive px-3 py-2 text-sm font-semibold text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex items-center gap-1 rounded-lg border border-destructive px-3 py-2 text-sm font-semibold text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={isMutationLoading}
                     onClick={() => {
                       setError("");
@@ -139,7 +142,8 @@ export default function NextMonthClient({
                     }}
                     type="button"
                   >
-                    {deletingID === item.id ? "Deleting…" : "Delete"}
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>{deletingID === item.id ? "Deleting…" : "Delete"}</span>
                   </button>
                 </div>
               </article>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowLeft, Dumbbell, ArrowRight } from "lucide-react";
 
 const apiBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
@@ -68,8 +69,8 @@ export default function GymVisits() {
   return (
     <main className="min-h-screen bg-background px-6 py-10 text-foreground sm:px-10 lg:px-16">
       <div className="mx-auto max-w-4xl">
-        <Link className="text-sm font-semibold text-primary transition hover:opacity-80" href="/dashboard">
-          ← Dashboard
+        <Link className="flex items-center gap-1 text-sm font-semibold text-primary transition hover:opacity-80" href="/dashboard">
+          <ArrowLeft className="h-4 w-4" /> Dashboard
         </Link>
         <p className="mt-5 text-sm font-semibold tracking-[0.18em] text-primary">GYM VISITS</p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Your gym history</h1>
@@ -97,13 +98,15 @@ export default function GymVisits() {
                       key={visit.id}
                     >
                       <div className="flex items-center gap-4">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-secondary-foreground text-lg" aria-hidden="true">🏋️</div>
+                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-secondary-foreground" aria-hidden="true">
+                          <Dumbbell className="h-5 w-5" />
+                        </div>
                         <div>
                           <h3 className="font-semibold text-foreground">Gym visit {dateVisits.length > 1 ? `#${dateVisits.length - index}` : ""}</h3>
                           <p className="mt-1 text-sm text-muted-foreground">{timeFormatter.format(new Date(visit.created_at))}</p>
                         </div>
                       </div>
-                      <span className="text-sm font-semibold text-primary">Open →</span>
+                      <span className="flex items-center gap-1 text-sm font-semibold text-primary">Open <ArrowRight className="h-4 w-4" /></span>
                     </Link>
                   ))}
                 </div>

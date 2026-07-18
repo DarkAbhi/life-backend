@@ -8,6 +8,7 @@ import {
   NotificationList,
 } from "../components/notification-list";
 import ConfirmationDialog from "../components/design-system/confirmation-dialog";
+import { Car, Dumbbell, Check, ArrowRight } from "lucide-react";
 
 const apiBaseURL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
@@ -293,10 +294,10 @@ export default function Dashboard() {
               href="/garage"
             >
               <div
-                className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-secondary-foreground text-xl"
+                className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-secondary-foreground"
                 aria-hidden="true"
               >
-                🚗
+                <Car className="h-6 w-6" />
               </div>
               <h3 className="mt-5 text-xl font-semibold text-foreground">
                 Garage
@@ -304,8 +305,8 @@ export default function Dashboard() {
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 Keep the details of your vehicles close at hand.
               </p>
-              <span className="mt-5 inline-flex text-sm font-semibold text-primary transition group-hover:opacity-80">
-                Explore garage →
+              <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition group-hover:opacity-80">
+                Explore garage <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </span>
             </Link>
             <article
@@ -313,10 +314,10 @@ export default function Dashboard() {
               onClick={() => router.push("/gym-visits")}
             >
               <div
-                className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-secondary-foreground text-xl"
+                className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-secondary-foreground"
                 aria-hidden="true"
               >
-                {gymVisited ? "✓" : "🏋️"}
+                {gymVisited ? <Check className="h-6 w-6 text-emerald-primary" /> : <Dumbbell className="h-6 w-6" />}
               </div>
               <h3 className="mt-5 text-xl font-semibold text-foreground">
                 Gym visit
@@ -354,11 +355,11 @@ export default function Dashboard() {
               </button>
               {gymVisited && gymVisitID && (
                 <Link
-                  className="mt-3 block w-full rounded-lg border border-border px-4 py-3 text-center text-sm font-semibold text-primary transition hover:bg-accent"
+                  className="mt-3 flex items-center justify-center gap-1.5 w-full rounded-lg border border-border px-4 py-3 text-center text-sm font-semibold text-primary transition hover:bg-accent"
                   href={`/gym-visits/${gymVisitID}`}
                   onClick={(event) => event.stopPropagation()}
                 >
-                  Log exercises from this visit →
+                  Log exercises from this visit <ArrowRight className="h-4 w-4" />
                 </Link>
               )}
             </article>
@@ -379,10 +380,10 @@ export default function Dashboard() {
               </p>
             </div>
             <Link
-              className="shrink-0 text-sm font-semibold text-primary transition hover:opacity-85"
+              className="shrink-0 flex items-center gap-1.5 text-sm font-semibold text-primary transition hover:opacity-85"
               href="/notifications"
             >
-              View all →
+              View all <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           {isNotificationsLoading ? (
@@ -429,10 +430,10 @@ export default function Dashboard() {
               </p>
             </div>
             <Link
-              className="shrink-0 text-sm font-semibold text-primary"
+              className="shrink-0 flex items-center gap-1.5 text-sm font-semibold text-primary"
               href="/next-month"
             >
-              View all →
+              View all <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <form

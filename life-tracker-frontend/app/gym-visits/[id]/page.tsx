@@ -4,6 +4,7 @@ import Link from "next/link";
 import { SubmitEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ConfirmationDialog from "../../components/design-system/confirmation-dialog";
+import { ArrowLeft, Trash2, Plus } from "lucide-react";
 
 const apiBaseURL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
@@ -149,17 +150,17 @@ export default function GymVisit() {
         <section>
           <div className="flex items-start justify-between gap-4">
             <Link
-              className="text-sm font-semibold text-primary transition hover:opacity-80"
+              className="flex items-center gap-1 text-sm font-semibold text-primary transition hover:opacity-80"
               href="/dashboard"
             >
-              ← Dashboard
+              <ArrowLeft className="h-4 w-4" /> Dashboard
             </Link>
             <button
-              className="rounded-lg px-3 py-2 text-sm font-semibold text-destructive transition hover:bg-destructive/10"
+              className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold text-destructive transition hover:bg-destructive/10"
               onClick={() => setIsConfirmingDelete(true)}
               type="button"
             >
-              Delete visit
+              <Trash2 className="h-4 w-4" /> Delete visit
             </button>
           </div>
           <p className="mt-5 text-sm font-semibold tracking-[0.18em] text-primary">
@@ -291,13 +292,13 @@ export default function GymVisit() {
                 </div>
               ))}
               <button
-                className="text-sm font-semibold text-primary transition hover:opacity-80"
+                className="flex items-center gap-1 text-sm font-semibold text-primary transition hover:opacity-80"
                 onClick={() =>
                   setSets((currentSets) => [...currentSets, newSet()])
                 }
                 type="button"
               >
-                + Add another set
+                <Plus className="h-4 w-4" /> Add another set
               </button>
             </fieldset>
 

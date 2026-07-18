@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { AppNotification, NotificationList } from "../components/notification-list";
 import { dismissNotification, markGymVisited, clearAllNotifications } from "./actions";
+import { ArrowLeft, Trash2 } from "lucide-react";
 
 interface NotificationsClientProps {
   notifications: AppNotification[];
@@ -52,7 +53,9 @@ export default function NotificationsClient({ notifications }: NotificationsClie
   return (
     <main className="min-h-screen bg-background px-6 py-10 text-foreground sm:px-10 lg:px-16">
       <div className="mx-auto max-w-3xl">
-        <Link className="text-sm font-semibold text-primary transition hover:opacity-80" href="/dashboard">← Dashboard</Link>
+        <Link className="flex items-center gap-1 text-sm font-semibold text-primary transition hover:opacity-80 w-fit" href="/dashboard">
+          <ArrowLeft className="h-4 w-4" /> Dashboard
+        </Link>
         <header className="mt-5 flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold tracking-[0.18em] text-primary">NOTIFICATIONS</p>
@@ -60,12 +63,13 @@ export default function NotificationsClient({ notifications }: NotificationsClie
             <p className="mt-3 text-base text-muted-foreground">Stay in the loop across every part of your life tracker.</p>
           </div>
           <button
-            className="shrink-0 rounded-lg border border-destructive px-4 py-3 text-sm font-semibold text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+            className="shrink-0 flex items-center gap-1.5 rounded-lg border border-destructive px-4 py-3 text-sm font-semibold text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isPending || notifications.length === 0}
             onClick={handleClearAll}
             type="button"
           >
-            {isPending ? "Clearing…" : "Clear all"}
+            <Trash2 className="h-4 w-4" />
+            <span>{isPending ? "Clearing…" : "Clear all"}</span>
           </button>
         </header>
 

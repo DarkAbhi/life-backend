@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import NextMonthClient from "./next-month-client";
+import { ArrowLeft } from "lucide-react";
 
 const apiBaseURL =
   process.env.NEXT_PUBLIC_INTERNAL_API_BASE_URL ??
@@ -35,7 +36,9 @@ export default async function NextMonthPage() {
     return (
       <main className="min-h-screen bg-[#fffaf3] px-6 py-10 text-stone-800 sm:px-10">
         <div className="mx-auto max-w-3xl">
-          <Link className="text-sm font-semibold text-sky-800" href="/dashboard">← Dashboard</Link>
+          <Link className="flex items-center gap-1 text-sm font-semibold text-sky-800" href="/dashboard">
+            <ArrowLeft className="h-4 w-4" /> Dashboard
+          </Link>
           <header className="mt-6 flex items-start justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-stone-900">Next month purchases</h1>

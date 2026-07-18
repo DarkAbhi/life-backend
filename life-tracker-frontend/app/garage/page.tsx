@@ -5,6 +5,7 @@ import { SubmitEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FuelForm, FuelFormItem } from "../components/fuel-form";
 import ConfirmationDialog from "../components/design-system/confirmation-dialog";
+import { ArrowLeft, Plus, Car } from "lucide-react";
 
 const apiBaseURL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
@@ -223,10 +224,10 @@ export default function Garage() {
         <header className="mb-10 flex items-start justify-between gap-4">
           <div>
             <Link
-              className="text-sm font-semibold text-primary transition hover:opacity-80"
+              className="flex items-center gap-1 text-sm font-semibold text-primary transition hover:opacity-80"
               href="/dashboard"
             >
-              ← Dashboard
+              <ArrowLeft className="h-4 w-4" /> Dashboard
             </Link>
             <p className="mt-5 text-sm font-semibold tracking-[0.18em] text-primary">
               LIFE TRACKER
@@ -239,14 +240,14 @@ export default function Garage() {
             </p>
           </div>
           <button
-            className="shrink-0 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus:outline-none focus:ring-4 focus:ring-primary/20"
+            className="shrink-0 flex items-center gap-1.5 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus:outline-none focus:ring-4 focus:ring-primary/20"
             onClick={() => {
               setError("");
               setIsAddOpen(true);
             }}
             type="button"
           >
-            + Add vehicle
+            <Plus className="h-4 w-4" /> Add vehicle
           </button>
         </header>
 
@@ -280,10 +281,10 @@ export default function Garage() {
                 onClick={() => router.push(`/garage/${vehicle.id}`)}
               >
                 <div
-                  className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-secondary-foreground text-lg"
+                  className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-secondary-foreground"
                   aria-hidden="true"
                 >
-                  🚗
+                  <Car className="h-5 w-5" />
                 </div>
                 <h2 className="mt-4 text-lg font-semibold text-foreground">
                   {vehicle.name}

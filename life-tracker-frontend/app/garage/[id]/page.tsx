@@ -5,6 +5,7 @@ import { AirFill, FuelFill } from "./types";
 import DeleteButton from "./delete-button";
 import EditFuelModal from "./edit-fuel-modal";
 import LocalDate from "../../components/local-date";
+import { ArrowLeft, Fuel, Wind } from "lucide-react";
 
 const apiBaseURL =
   process.env.NEXT_PUBLIC_INTERNAL_API_BASE_URL ??
@@ -70,8 +71,8 @@ export default async function VehiclePage({ params, searchParams }: PageProps) {
   return (
     <main className="min-h-screen bg-background px-6 py-10 text-foreground sm:px-10">
       <div className="mx-auto max-w-4xl">
-        <Link className="text-sm font-semibold text-primary hover:opacity-80" href="/garage">
-          ← Garage
+        <Link className="flex items-center gap-1 text-sm font-semibold text-primary hover:opacity-80" href="/garage">
+          <ArrowLeft className="h-4 w-4" /> Garage
         </Link>
         <p className="mt-6 text-sm font-semibold tracking-[0.18em] text-primary">
           VEHICLE HISTORY
@@ -81,7 +82,9 @@ export default async function VehiclePage({ params, searchParams }: PageProps) {
         </h1>
         <div className="mt-8 grid gap-8 lg:grid-cols-2">
           <section>
-            <h2 className="text-xl font-semibold">Fuel fill-ups</h2>
+            <h2 className="flex items-center gap-2 text-xl font-semibold">
+              <Fuel className="h-5 w-5 text-primary" /> Fuel fill-ups
+            </h2>
             <div className="mt-4 space-y-3">
               {data.fuel_fillups.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No fuel entries yet.</p>
@@ -127,7 +130,9 @@ export default async function VehiclePage({ params, searchParams }: PageProps) {
             </div>
           </section>
           <section>
-            <h2 className="text-xl font-semibold">Air fills</h2>
+            <h2 className="flex items-center gap-2 text-xl font-semibold">
+              <Wind className="h-5 w-5 text-primary" /> Air fills
+            </h2>
             <div className="mt-4 space-y-3">
               {data.air_fills.map((fill) => (
                 <article

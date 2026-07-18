@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppNotification } from "../components/notification-list";
 import NotificationsClient from "./notifications-client";
+import { ArrowLeft } from "lucide-react";
 
 const apiBaseURL =
   process.env.NEXT_PUBLIC_INTERNAL_API_BASE_URL ??
@@ -35,10 +36,10 @@ export default async function NotificationsPage() {
       <main className="min-h-screen bg-[#fffaf3] px-6 py-10 text-stone-800 sm:px-10 lg:px-16">
         <div className="mx-auto max-w-3xl">
           <Link
-            className="text-sm font-semibold text-amber-800 transition hover:text-amber-950"
+            className="flex items-center gap-1 text-sm font-semibold text-amber-800 transition hover:text-amber-950"
             href="/dashboard"
           >
-            ← Dashboard
+            <ArrowLeft className="h-4 w-4" /> Dashboard
           </Link>
           <header className="mt-5">
             <p className="text-sm font-semibold tracking-[0.18em] text-amber-700">
