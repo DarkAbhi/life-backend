@@ -11,7 +11,9 @@ import (
 	"github.com/joho/godotenv"
 
 	db "github.com/DarkAbhi/life-backend/internal/db"
+	"github.com/DarkAbhi/life-backend/internal/gym"
 	"github.com/DarkAbhi/life-backend/internal/handlers"
+	"github.com/DarkAbhi/life-backend/internal/vehicle"
 )
 
 func main() {
@@ -64,8 +66,8 @@ func main() {
 
 	// --- Normal server boot ---
 	d := db.ConnectDB()
-	go handlers.RunAirFillReminderJob(d)
-	go handlers.RunGymReminderJob(d)
+	go vehicle.RunAirFillReminderJob(d)
+	go gym.RunGymReminderJob(d)
 
 	port := os.Getenv("PORT")
 	if port == "" {

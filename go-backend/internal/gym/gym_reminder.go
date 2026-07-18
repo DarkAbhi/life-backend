@@ -1,14 +1,13 @@
-package handlers
+package gym
 
 import (
 	"database/sql"
 	"errors"
 	"log"
-	"net/http"
 	"time"
-)
 
-const gymReminderSource = "Gym reminder"
+	"github.com/DarkAbhi/life-backend/internal/timeutil"
+)
 
 // RunGymReminderJob creates the weekday gym reminder at 3:30 PM India time.
 // It also catches up after a restart later on the same eligible day.
@@ -22,7 +21,7 @@ func RunGymReminderJob(database *sql.DB) {
 }
 
 func createDueGymReminders(database *sql.DB, now time.Time) {
-	location, err := time.LoadLocation(indiaTimeZone)
+	location, err := time.LoadLocation(timeutil.IndiaTimeZone)
 	if err != nil {
 		log.Printf("gym reminder timezone load failed: %v", err)
 		return
@@ -84,54 +83,4 @@ func createGymReminder(database *sql.DB, userID int64, reminderDate string) erro
 		return err
 	}
 	return tx.Commit()
-}
-
-// MarkGymReminderVisited records a gym visit from the reminder card and dismisses it.
-func (a *API) MarkGymReminderVisited(w http.ResponseWriter, r *http.Request) {
-	user, ok := a.notificationUser(w, r)
-	if !ok {
-		return
-	}
-	notificationID, ok := parseID(w, r)
-	if !ok {
-		return
-	}
-
-	tx, err := a.DB.Begin()
-	if err != nil {
-		serverError(w, err)
-		return
-	}
-	defer tx.Rollback()
-
-	var reminderExists bool
-	err = tx.QueryRow(`
-		SELECT EXISTS(
-			SELECT 1 FROM notifications
-			WHERE id = $1 AND user_id = $2 AND source = $3 AND dismissed_at IS NULL
-		)
-	`, notificationID, user.ID, gymReminderSource).Scan(&reminderExists)
-	if err != nil {
-		serverError(w, err)
-		return
-	}
-	if !reminderExists {
-		http.NotFound(w, r)
-		return
-	}
-
-	var visitID int64
-	if err := tx.QueryRow(`INSERT INTO gym_visits DEFAULT VALUES RETURNING id`).Scan(&visitID); err != nil {
-		serverError(w, err)
-		return
-	}
-	if _, err := tx.Exec(`UPDATE notifications SET dismissed_at = NOW() WHERE id = $1`, notificationID); err != nil {
-		serverError(w, err)
-		return
-	}
-	if err := tx.Commit(); err != nil {
-		serverError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, map[string]any{"id": visitID})
 }

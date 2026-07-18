@@ -1,4 +1,4 @@
-package handlers
+package auth
 
 import (
 	"crypto/rand"
@@ -13,11 +13,13 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/DarkAbhi/life-backend/internal/webutil"
 )
 
 const (
-	sessionCookieName = "life_session"
-	sessionLifetime   = 30 * 24 * time.Hour
+	SessionCookieName = "life_session"
+	SessionLifetime   = 30 * 24 * time.Hour
 )
 
 type loginBody struct {
@@ -25,68 +27,75 @@ type loginBody struct {
 	Password string `json:"password"`
 }
 
-type sessionUser struct {
+type SessionUser struct {
 	ID       int64
 	Username string
 }
 
+type Handler struct {
+	DB *sql.DB
+}
+
+func NewHandler(db *sql.DB) *Handler {
+	return &Handler{DB: db}
+}
+
 // Login verifies a username and password and creates a database-backed session.
-// The session identifier is sent only as an HTTP-only cookie, not in the JSON body.
-func (a *API) Login(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer r.Body.Close()
 
 	var body loginBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		badRequest(w, "invalid JSON")
+		webutil.BadRequest(w, "invalid JSON")
 		return
 	}
 
 	username := strings.TrimSpace(body.Username)
 	if username == "" || body.Password == "" {
-		badRequest(w, "username and password are required")
+		webutil.BadRequest(w, "username and password are required")
 		return
 	}
 
 	var userID int64
 	var passwordHash string
-	err := a.DB.QueryRow(
+	err := h.DB.QueryRow(
 		`SELECT id, password_hash FROM users WHERE username = $1`,
 		username,
 	).Scan(&userID, &passwordHash)
 	if errors.Is(err, sql.ErrNoRows) {
-		unauthorized(w, "invalid username or password")
+		webutil.Unauthorized(w, "invalid username or password")
 		return
 	}
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(body.Password)) != nil {
-		unauthorized(w, "invalid username or password")
+		webutil.Unauthorized(w, "invalid username or password")
 		return
 	}
 
 	token, err := newSessionToken()
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 
-	expiresAt := time.Now().UTC().Add(sessionLifetime)
+	expiresAt := time.Now().UTC().Add(SessionLifetime)
 	hash := sha256.Sum256([]byte(token))
-	if _, err := a.DB.Exec(
+	if _, err := h.DB.Exec(
 		`INSERT INTO user_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
 		userID,
 		hex.EncodeToString(hash[:]),
 		expiresAt,
 	); err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
+		Name:     SessionCookieName,
 		Value:    token,
 		Path:     "/",
 		Expires:  expiresAt,
@@ -94,33 +103,33 @@ func (a *API) Login(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		Secure:   os.Getenv("APP_ENV") == "production",
 	})
-	writeJSON(w, http.StatusOK, map[string]string{"username": username})
+	webutil.WriteJSON(w, http.StatusOK, map[string]string{"username": username})
 }
 
 // Session returns the signed-in user for a valid, non-expired session cookie.
-// The browser uses this after a refresh instead of storing auth state itself.
-func (a *API) Session(w http.ResponseWriter, r *http.Request) {
-	user, err := a.sessionUser(r)
+func (h *Handler) Session(w http.ResponseWriter, r *http.Request) {
+	user, err := GetSessionUser(h.DB, r)
 	if errors.Is(err, sql.ErrNoRows) {
-		unauthorized(w, "session is invalid or expired")
+		webutil.Unauthorized(w, "session is invalid or expired")
 		return
 	}
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"username": user.Username})
+	webutil.WriteJSON(w, http.StatusOK, map[string]string{"username": user.Username})
 }
 
-func (a *API) sessionUser(r *http.Request) (sessionUser, error) {
-	cookie, err := r.Cookie(sessionCookieName)
+// GetSessionUser retrieves the session user using the cookie and DB connection.
+func GetSessionUser(db *sql.DB, r *http.Request) (SessionUser, error) {
+	cookie, err := r.Cookie(SessionCookieName)
 	if err != nil || cookie.Value == "" {
-		return sessionUser{}, sql.ErrNoRows
+		return SessionUser{}, sql.ErrNoRows
 	}
 
 	hash := sha256.Sum256([]byte(cookie.Value))
-	var user sessionUser
-	err = a.DB.QueryRow(`
+	var user SessionUser
+	err = db.QueryRow(`
 		SELECT users.id, users.username
 		FROM user_sessions
 		JOIN users ON users.id = user_sessions.user_id

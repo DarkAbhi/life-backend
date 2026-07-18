@@ -7,6 +7,16 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/DarkAbhi/life-backend/internal/auth"
+	"github.com/DarkAbhi/life-backend/internal/gym"
+	"github.com/DarkAbhi/life-backend/internal/health"
+	"github.com/DarkAbhi/life-backend/internal/meditation"
+	"github.com/DarkAbhi/life-backend/internal/notification"
+	"github.com/DarkAbhi/life-backend/internal/profile"
+	"github.com/DarkAbhi/life-backend/internal/purchase"
+	"github.com/DarkAbhi/life-backend/internal/sport"
+	"github.com/DarkAbhi/life-backend/internal/vehicle"
 )
 
 type API struct {
@@ -20,50 +30,60 @@ func (a *API) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(cors)
 
+	authHandler := auth.NewHandler(a.DB)
+	healthHandler := health.NewHandler(a.DB)
+	profileHandler := profile.NewHandler(a.DB)
+	notifHandler := notification.NewHandler(a.DB)
+	purchaseHandler := purchase.NewHandler(a.DB)
+	gymHandler := gym.NewHandler(a.DB)
+	meditationHandler := meditation.NewHandler(a.DB)
+	sportHandler := sport.NewHandler(a.DB)
+	vehicleHandler := vehicle.NewHandler(a.DB)
+
 	// Health (outside /api so Docker or Kubernetes health probes stay simple)
-	r.Get("/healthz", a.Healthz) // liveness
-	r.Get("/readyz", a.Readyz)   // readiness (DB ping)
+	r.Get("/healthz", healthHandler.Healthz) // liveness
+	r.Get("/readyz", healthHandler.Readyz)   // readiness (DB ping)
 
 	// All application APIs under /api
 	r.Route("/api", func(api chi.Router) {
-		api.Post("/auth/login", a.Login)
-		api.Get("/auth/session", a.Session)
-		api.Get("/profile", a.GetProfile)
-		api.Put("/profile", a.SaveProfile)
-		api.Get("/notifications", a.ListNotifications)
-		api.Delete("/notifications", a.ClearNotifications)
-		api.Delete("/notifications/{id}", a.DismissNotification)
-		api.Post("/notifications/{id}/gym-visit", a.MarkGymReminderVisited)
-		api.Get("/next-month-purchases", a.NextMonthPurchases)
-		api.Post("/next-month-purchases", a.CreateNextMonthPurchase)
-		api.Delete("/next-month-purchases", a.ClearNextMonthPurchases)
-		api.Delete("/next-month-purchases/{id}", a.DeleteNextMonthPurchase)
+		api.Post("/auth/login", authHandler.Login)
+		api.Get("/auth/session", authHandler.Session)
+		api.Get("/profile", profileHandler.GetProfile)
+		api.Put("/profile", profileHandler.SaveProfile)
+		api.Get("/notifications", notifHandler.ListNotifications)
+		api.Delete("/notifications", notifHandler.ClearNotifications)
+		api.Delete("/notifications/{id}", notifHandler.DismissNotification)
+		api.Post("/notifications/{id}/gym-visit", gymHandler.MarkGymReminderVisited)
+		api.Get("/next-month-purchases", purchaseHandler.NextMonthPurchases)
+		api.Post("/next-month-purchases", purchaseHandler.CreateNextMonthPurchase)
+		api.Delete("/next-month-purchases", purchaseHandler.ClearNextMonthPurchases)
+		api.Delete("/next-month-purchases/{id}", purchaseHandler.DeleteNextMonthPurchase)
 		// Daily logs
-		api.Get("/workout/today", a.GymVisitedToday)
-		api.Post("/workout/today", a.AddWorkoutForDay)
-		api.Get("/gym-visits", a.ListGymVisits)
-		api.Delete("/gym-visits/{id}", a.DeleteGymVisit)
-		api.Get("/gym-visits/{id}/exercises", a.GetGymVisitExercises)
-		api.Post("/gym-visits/{id}/exercises", a.CreateGymVisitExercise)
-		api.Post("/meditation/today", a.AddMeditationForDay)
-		api.Post("/sport/today", a.AddSportForDay)
+		api.Get("/workout/today", gymHandler.GymVisitedToday)
+		api.Post("/workout/today", gymHandler.AddWorkoutForDay)
+		api.Get("/gym-visits", gymHandler.ListGymVisits)
+		api.Delete("/gym-visits/{id}", gymHandler.DeleteGymVisit)
+		api.Get("/gym-visits/{id}/exercises", gymHandler.GetGymVisitExercises)
+		api.Post("/gym-visits/{id}/exercises", gymHandler.CreateGymVisitExercise)
+		api.Post("/meditation/today", meditationHandler.AddMeditationForDay)
+		api.Post("/sport/today", sportHandler.AddSportForDay)
 
 		// Vehicles
-		api.Get("/vehicles", a.ListVehicles)
-		api.Post("/vehicles", a.CreateVehicle) // create
-		api.Get("/vehicle-air-fills/latest", a.ListLatestVehicleAirFills)
+		api.Get("/vehicles", vehicleHandler.ListVehicles)
+		api.Post("/vehicles", vehicleHandler.CreateVehicle) // create
+		api.Get("/vehicle-air-fills/latest", vehicleHandler.ListLatestVehicleAirFills)
 
 		api.Route("/vehicles/{id}", func(v chi.Router) {
-			v.Get("/", a.GetVehicle)       // retrieve by id
-			v.Put("/", a.UpdateVehicle)    // full/partial update
-			v.Patch("/", a.UpdateVehicle)  // alias to update
-			v.Delete("/", a.DeleteVehicle) // delete
-			v.Post("/air-fills", a.CreateVehicleAirFill)
-			v.Post("/fuel-fillups", a.CreateFuelFillup)
-			v.Put("/fuel-fillups/{fillupID}", a.UpdateFuelFillup)
-			v.Get("/history", a.VehicleHistory)
-			v.Delete("/air-fills/{airFillID}", a.DeleteVehicleAirFill)
-			v.Delete("/fuel-fillups/{fillupID}", a.DeleteFuelFillup)
+			v.Get("/", vehicleHandler.GetVehicle)       // retrieve by id
+			v.Put("/", vehicleHandler.UpdateVehicle)    // full/partial update
+			v.Patch("/", vehicleHandler.UpdateVehicle)  // alias to update
+			v.Delete("/", vehicleHandler.DeleteVehicle) // delete
+			v.Post("/air-fills", vehicleHandler.CreateVehicleAirFill)
+			v.Post("/fuel-fillups", vehicleHandler.CreateFuelFillup)
+			v.Put("/fuel-fillups/{fillupID}", vehicleHandler.UpdateFuelFillup)
+			v.Get("/history", vehicleHandler.VehicleHistory)
+			v.Delete("/air-fills/{airFillID}", vehicleHandler.DeleteVehicleAirFill)
+			v.Delete("/fuel-fillups/{fillupID}", vehicleHandler.DeleteFuelFillup)
 		})
 	})
 

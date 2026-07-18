@@ -1,4 +1,4 @@
-package handlers
+package vehicle
 
 import (
 	"database/sql"
@@ -6,6 +6,9 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/DarkAbhi/life-backend/internal/auth"
+	"github.com/DarkAbhi/life-backend/internal/webutil"
 )
 
 type vehicleAirFillDTO struct {
@@ -13,24 +16,25 @@ type vehicleAirFillDTO struct {
 	FilledAt  time.Time `json:"filled_at"`
 }
 
-func (a *API) CreateVehicleAirFill(w http.ResponseWriter, r *http.Request) {
-	user, err := a.sessionUser(r)
+// CreateVehicleAirFill records a new air fill event for a vehicle.
+func (h *Handler) CreateVehicleAirFill(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetSessionUser(h.DB, r)
 	if errors.Is(err, sql.ErrNoRows) {
-		unauthorized(w, "session is invalid or expired")
+		webutil.Unauthorized(w, "session is invalid or expired")
 		return
 	}
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
-	vehicleID, ok := parseID(w, r)
+	vehicleID, ok := webutil.ParseID(w, r)
 	if !ok {
 		return
 	}
 
 	var vehicleExists bool
-	if err := a.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM vehicles WHERE id = $1)`, vehicleID).Scan(&vehicleExists); err != nil {
-		serverError(w, err)
+	if err := h.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM vehicles WHERE id = $1)`, vehicleID).Scan(&vehicleExists); err != nil {
+		webutil.ServerError(w, err)
 		return
 	}
 	if !vehicleExists {
@@ -39,36 +43,37 @@ func (a *API) CreateVehicleAirFill(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var filledAt time.Time
-	if err := a.DB.QueryRow(`
+	if err := h.DB.QueryRow(`
 		INSERT INTO vehicle_air_fills (vehicle_id, user_id)
 		VALUES ($1, $2)
 		RETURNING filled_at
 	`, vehicleID, user.ID).Scan(&filledAt); err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, vehicleAirFillDTO{VehicleID: vehicleID, FilledAt: filledAt.UTC()})
+	webutil.WriteJSON(w, http.StatusCreated, vehicleAirFillDTO{VehicleID: vehicleID, FilledAt: filledAt.UTC()})
 }
 
-func (a *API) ListLatestVehicleAirFills(w http.ResponseWriter, r *http.Request) {
-	user, err := a.sessionUser(r)
+// ListLatestVehicleAirFills lists the latest air fills across vehicles.
+func (h *Handler) ListLatestVehicleAirFills(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetSessionUser(h.DB, r)
 	if errors.Is(err, sql.ErrNoRows) {
-		unauthorized(w, "session is invalid or expired")
+		webutil.Unauthorized(w, "session is invalid or expired")
 		return
 	}
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 
-	rows, err := a.DB.Query(`
+	rows, err := h.DB.Query(`
 		SELECT DISTINCT ON (vehicle_id) vehicle_id, filled_at
 		FROM vehicle_air_fills
 		WHERE user_id = $1
 		ORDER BY vehicle_id, filled_at DESC, id DESC
 	`, user.ID)
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 	defer rows.Close()
@@ -77,17 +82,17 @@ func (a *API) ListLatestVehicleAirFills(w http.ResponseWriter, r *http.Request) 
 	for rows.Next() {
 		var fill vehicleAirFillDTO
 		if err := rows.Scan(&fill.VehicleID, &fill.FilledAt); err != nil {
-			serverError(w, err)
+			webutil.ServerError(w, err)
 			return
 		}
 		fill.FilledAt = fill.FilledAt.UTC()
 		fills = append(fills, fill)
 	}
 	if err := rows.Err(); err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, fills)
+	webutil.WriteJSON(w, http.StatusOK, fills)
 }
 
 // RunAirFillReminderJob creates each overdue air-fill reminder once.

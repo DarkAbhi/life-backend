@@ -1,4 +1,4 @@
-package handlers
+package profile
 
 import (
 	"database/sql"
@@ -6,49 +6,60 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+
+	"github.com/DarkAbhi/life-backend/internal/auth"
+	"github.com/DarkAbhi/life-backend/internal/webutil"
 )
 
 type profileBody struct {
 	Name string `json:"name"`
 }
 
+type Handler struct {
+	DB *sql.DB
+}
+
+func NewHandler(db *sql.DB) *Handler {
+	return &Handler{DB: db}
+}
+
 // GetProfile reports whether the signed-in user has completed first-run setup.
-func (a *API) GetProfile(w http.ResponseWriter, r *http.Request) {
-	user, err := a.sessionUser(r)
+func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetSessionUser(h.DB, r)
 	if errors.Is(err, sql.ErrNoRows) {
-		unauthorized(w, "session is invalid or expired")
+		webutil.Unauthorized(w, "session is invalid or expired")
 		return
 	}
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 
 	var name string
-	err = a.DB.QueryRow(
+	err = h.DB.QueryRow(
 		`SELECT display_name FROM user_profiles WHERE user_id = $1`,
 		user.ID,
 	).Scan(&name)
 	if errors.Is(err, sql.ErrNoRows) {
-		writeJSON(w, http.StatusOK, map[string]any{"has_profile": false})
+		webutil.WriteJSON(w, http.StatusOK, map[string]any{"has_profile": false})
 		return
 	}
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"has_profile": true, "name": name})
+	webutil.WriteJSON(w, http.StatusOK, map[string]any{"has_profile": true, "name": name})
 }
 
 // SaveProfile creates or updates the signed-in user's profile.
-func (a *API) SaveProfile(w http.ResponseWriter, r *http.Request) {
-	user, err := a.sessionUser(r)
+func (h *Handler) SaveProfile(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetSessionUser(h.DB, r)
 	if errors.Is(err, sql.ErrNoRows) {
-		unauthorized(w, "session is invalid or expired")
+		webutil.Unauthorized(w, "session is invalid or expired")
 		return
 	}
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 
@@ -56,25 +67,25 @@ func (a *API) SaveProfile(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	var body profileBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		badRequest(w, "invalid JSON")
+		webutil.BadRequest(w, "invalid JSON")
 		return
 	}
 
 	name := strings.TrimSpace(body.Name)
 	if name == "" || len([]rune(name)) > 120 {
-		badRequest(w, "name must be between 1 and 120 characters")
+		webutil.BadRequest(w, "name must be between 1 and 120 characters")
 		return
 	}
 
-	_, err = a.DB.Exec(`
+	_, err = h.DB.Exec(`
 		INSERT INTO user_profiles (user_id, display_name)
 		VALUES ($1, $2)
 		ON CONFLICT (user_id)
 		DO UPDATE SET display_name = EXCLUDED.display_name, updated_at = NOW()
 	`, user.ID, name)
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"name": name})
+	webutil.WriteJSON(w, http.StatusOK, map[string]string{"name": name})
 }

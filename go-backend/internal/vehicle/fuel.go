@@ -1,4 +1,4 @@
-package handlers
+package vehicle
 
 import (
 	"database/sql"
@@ -10,6 +10,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/DarkAbhi/life-backend/internal/auth"
+	"github.com/DarkAbhi/life-backend/internal/webutil"
 )
 
 type fuelItemInput struct {
@@ -19,6 +22,7 @@ type fuelItemInput struct {
 	UnitPrice *float64 `json:"unit_price"`
 	TotalCost *float64 `json:"total_cost"`
 }
+
 type fuelFillupInput struct {
 	OdometerKM  float64         `json:"odometer_km"`
 	FilledAt    *time.Time      `json:"filled_at"`
@@ -27,32 +31,33 @@ type fuelFillupInput struct {
 	Items       []fuelItemInput `json:"items"`
 }
 
-func (a *API) CreateFuelFillup(w http.ResponseWriter, r *http.Request) {
-	user, err := a.sessionUser(r)
+// CreateFuelFillup logs a new fuel fill-up event.
+func (h *Handler) CreateFuelFillup(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetSessionUser(h.DB, r)
 	if errors.Is(err, sql.ErrNoRows) {
-		unauthorized(w, "session is invalid or expired")
+		webutil.Unauthorized(w, "session is invalid or expired")
 		return
 	}
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
-	vehicleID, ok := parseID(w, r)
+	vehicleID, ok := webutil.ParseID(w, r)
 	if !ok {
 		return
 	}
 	var in fuelFillupInput
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&in); err != nil {
-		badRequest(w, "invalid JSON")
+		webutil.BadRequest(w, "invalid JSON")
 		return
 	}
 	if in.OdometerKM < 0 || len(in.Items) == 0 || len(in.Items) > 2 {
-		badRequest(w, "odometer and one or two fuel tanks are required")
+		webutil.BadRequest(w, "odometer and one or two fuel tanks are required")
 		return
 	}
 	for i := range in.Items {
 		if err := normalizeFuelItem(&in.Items[i]); err != nil {
-			badRequest(w, err.Error())
+			webutil.BadRequest(w, err.Error())
 			return
 		}
 	}
@@ -60,74 +65,75 @@ func (a *API) CreateFuelFillup(w http.ResponseWriter, r *http.Request) {
 	if in.FilledAt != nil {
 		filledAt = *in.FilledAt
 	}
-	tx, err := a.DB.BeginTx(r.Context(), nil)
+	tx, err := h.DB.BeginTx(r.Context(), nil)
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 	defer tx.Rollback()
 	var previousOdometer sql.NullFloat64
 	if err := tx.QueryRow(`SELECT MAX(odometer_km) FROM vehicle_fuel_fillups WHERE vehicle_id=$1`, vehicleID).Scan(&previousOdometer); err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 	if previousOdometer.Valid && in.OdometerKM < previousOdometer.Float64 {
-		badRequest(w, "odometer cannot be lower than a previous fuel entry")
+		webutil.BadRequest(w, "odometer cannot be lower than a previous fuel entry")
 		return
 	}
 	var fillupID int64
 	if err := tx.QueryRow(`INSERT INTO vehicle_fuel_fillups (vehicle_id,user_id,odometer_km,filled_at,station_name,notes) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`, vehicleID, user.ID, in.OdometerKM, filledAt, in.StationName, in.Notes).Scan(&fillupID); err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 	for _, item := range in.Items {
 		if _, err := tx.Exec(`INSERT INTO vehicle_fuel_items (fillup_id,fuel_type,fill_type,quantity,unit_price,total_cost) VALUES ($1,$2,$3,$4,$5,$6)`, fillupID, item.FuelType, item.FillType, *item.Quantity, *item.UnitPrice, *item.TotalCost); err != nil {
-			serverError(w, err)
+			webutil.ServerError(w, err)
 			return
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 	economies := map[string]*float64{}
 	for _, item := range in.Items {
-		economies[item.FuelType] = a.latestFuelEconomy(vehicleID, item.FuelType)
+		economies[item.FuelType] = h.latestFuelEconomy(vehicleID, item.FuelType)
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"id": fillupID, "economy_km_per_litre": economies})
+	webutil.WriteJSON(w, http.StatusCreated, map[string]any{"id": fillupID, "economy_km_per_litre": economies})
 }
 
-func (a *API) UpdateFuelFillup(w http.ResponseWriter, r *http.Request) {
-	user, err := a.sessionUser(r)
+// UpdateFuelFillup updates an existing fuel fillup record.
+func (h *Handler) UpdateFuelFillup(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetSessionUser(h.DB, r)
 	if errors.Is(err, sql.ErrNoRows) {
-		unauthorized(w, "session is invalid or expired")
+		webutil.Unauthorized(w, "session is invalid or expired")
 		return
 	}
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
-	vehicleID, ok := parseID(w, r)
+	vehicleID, ok := webutil.ParseID(w, r)
 	if !ok {
 		return
 	}
 	fillupID, err := strconv.ParseInt(chi.URLParam(r, "fillupID"), 10, 64)
 	if err != nil || fillupID <= 0 {
-		badRequest(w, "invalid fuel fill-up id")
+		webutil.BadRequest(w, "invalid fuel fill-up id")
 		return
 	}
 	var in fuelFillupInput
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&in); err != nil {
-		badRequest(w, "invalid JSON")
+		webutil.BadRequest(w, "invalid JSON")
 		return
 	}
 	if in.OdometerKM < 0 || len(in.Items) == 0 || len(in.Items) > 2 {
-		badRequest(w, "odometer and one or two fuel tanks are required")
+		webutil.BadRequest(w, "odometer and one or two fuel tanks are required")
 		return
 	}
 	for i := range in.Items {
 		if err := normalizeFuelItem(&in.Items[i]); err != nil {
-			badRequest(w, err.Error())
+			webutil.BadRequest(w, err.Error())
 			return
 		}
 	}
@@ -135,9 +141,9 @@ func (a *API) UpdateFuelFillup(w http.ResponseWriter, r *http.Request) {
 	if in.FilledAt != nil {
 		filledAt = *in.FilledAt
 	}
-	tx, err := a.DB.BeginTx(r.Context(), nil)
+	tx, err := h.DB.BeginTx(r.Context(), nil)
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 	defer tx.Rollback()
@@ -146,28 +152,28 @@ func (a *API) UpdateFuelFillup(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	} else if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 	if _, err := tx.Exec(`UPDATE vehicle_fuel_fillups SET odometer_km=$1,filled_at=$2,station_name=$3,notes=$4 WHERE id=$5`, in.OdometerKM, filledAt, in.StationName, in.Notes, fillupID); err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 	if _, err := tx.Exec(`DELETE FROM vehicle_fuel_items WHERE fillup_id=$1`, fillupID); err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 	for _, item := range in.Items {
 		if _, err := tx.Exec(`INSERT INTO vehicle_fuel_items (fillup_id,fuel_type,fill_type,quantity,unit_price,total_cost) VALUES ($1,$2,$3,$4,$5,$6)`, fillupID, item.FuelType, item.FillType, *item.Quantity, *item.UnitPrice, *item.TotalCost); err != nil {
-			serverError(w, err)
+			webutil.ServerError(w, err)
 			return
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"id": fillupID})
+	webutil.WriteJSON(w, http.StatusOK, map[string]any{"id": fillupID})
 }
 
 func normalizeFuelItem(item *fuelItemInput) error {
@@ -208,8 +214,8 @@ func normalizeFuelItem(item *fuelItemInput) error {
 	return nil
 }
 
-func (a *API) latestFuelEconomy(vehicleID int64, fuelType string) *float64 {
-	rows, err := a.DB.Query(`SELECT f.odometer_km, i.fill_type, i.quantity FROM vehicle_fuel_fillups f JOIN vehicle_fuel_items i ON i.fillup_id=f.id WHERE f.vehicle_id=$1 AND i.fuel_type=$2 ORDER BY f.filled_at, f.id`, vehicleID, fuelType)
+func (h *Handler) latestFuelEconomy(vehicleID int64, fuelType string) *float64 {
+	rows, err := h.DB.Query(`SELECT f.odometer_km, i.fill_type, i.quantity FROM vehicle_fuel_fillups f JOIN vehicle_fuel_items i ON i.fillup_id=f.id WHERE f.vehicle_id=$1 AND i.fuel_type=$2 ORDER BY f.filled_at, f.id`, vehicleID, fuelType)
 	if err != nil {
 		return nil
 	}

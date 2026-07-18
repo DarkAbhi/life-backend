@@ -1,10 +1,13 @@
-package handlers
+package notification
 
 import (
 	"database/sql"
 	"errors"
 	"net/http"
 	"strconv"
+
+	"github.com/DarkAbhi/life-backend/internal/auth"
+	"github.com/DarkAbhi/life-backend/internal/webutil"
 )
 
 type notificationDTO struct {
@@ -17,8 +20,16 @@ type notificationDTO struct {
 	CreatedAt  string  `json:"created_at"`
 }
 
-func (a *API) ListNotifications(w http.ResponseWriter, r *http.Request) {
-	user, ok := a.notificationUser(w, r)
+type Handler struct {
+	DB *sql.DB
+}
+
+func NewHandler(db *sql.DB) *Handler {
+	return &Handler{DB: db}
+}
+
+func (h *Handler) ListNotifications(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.notificationUser(w, r)
 	if !ok {
 		return
 	}
@@ -27,13 +38,13 @@ func (a *API) ListNotifications(w http.ResponseWriter, r *http.Request) {
 	if rawLimit := r.URL.Query().Get("limit"); rawLimit != "" {
 		parsedLimit, err := strconv.Atoi(rawLimit)
 		if err != nil || parsedLimit < 1 || parsedLimit > 100 {
-			badRequest(w, "limit must be between 1 and 100")
+			webutil.BadRequest(w, "limit must be between 1 and 100")
 			return
 		}
 		limit = parsedLimit
 	}
 
-	rows, err := a.DB.Query(`
+	rows, err := h.DB.Query(`
 		SELECT id, source, title, body, target_path, priority, created_at
 		FROM notifications
 		WHERE user_id = $1 AND dismissed_at IS NULL
@@ -41,7 +52,7 @@ func (a *API) ListNotifications(w http.ResponseWriter, r *http.Request) {
 		LIMIT $2
 	`, user.ID, limit)
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 	defer rows.Close()
@@ -59,7 +70,7 @@ func (a *API) ListNotifications(w http.ResponseWriter, r *http.Request) {
 			&notification.Priority,
 			&createdAt,
 		); err != nil {
-			serverError(w, err)
+			webutil.ServerError(w, err)
 			return
 		}
 		if createdAt.Valid {
@@ -68,34 +79,34 @@ func (a *API) ListNotifications(w http.ResponseWriter, r *http.Request) {
 		notifications = append(notifications, notification)
 	}
 	if err := rows.Err(); err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, notifications)
+	webutil.WriteJSON(w, http.StatusOK, notifications)
 }
 
-func (a *API) DismissNotification(w http.ResponseWriter, r *http.Request) {
-	user, ok := a.notificationUser(w, r)
+func (h *Handler) DismissNotification(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.notificationUser(w, r)
 	if !ok {
 		return
 	}
-	notificationID, ok := parseID(w, r)
+	notificationID, ok := webutil.ParseID(w, r)
 	if !ok {
 		return
 	}
 
-	result, err := a.DB.Exec(`
+	result, err := h.DB.Exec(`
 		UPDATE notifications
 		SET dismissed_at = NOW()
 		WHERE id = $1 AND user_id = $2 AND dismissed_at IS NULL
 	`, notificationID, user.ID)
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 	updated, err := result.RowsAffected()
 	if err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 	if updated == 0 {
@@ -105,31 +116,31 @@ func (a *API) DismissNotification(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (a *API) ClearNotifications(w http.ResponseWriter, r *http.Request) {
-	user, ok := a.notificationUser(w, r)
+func (h *Handler) ClearNotifications(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.notificationUser(w, r)
 	if !ok {
 		return
 	}
-	if _, err := a.DB.Exec(`
+	if _, err := h.DB.Exec(`
 		UPDATE notifications
 		SET dismissed_at = NOW()
 		WHERE user_id = $1 AND dismissed_at IS NULL
 	`, user.ID); err != nil {
-		serverError(w, err)
+		webutil.ServerError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (a *API) notificationUser(w http.ResponseWriter, r *http.Request) (sessionUser, bool) {
-	user, err := a.sessionUser(r)
+func (h *Handler) notificationUser(w http.ResponseWriter, r *http.Request) (auth.SessionUser, bool) {
+	user, err := auth.GetSessionUser(h.DB, r)
 	if errors.Is(err, sql.ErrNoRows) {
-		unauthorized(w, "session is invalid or expired")
-		return sessionUser{}, false
+		webutil.Unauthorized(w, "session is invalid or expired")
+		return auth.SessionUser{}, false
 	}
 	if err != nil {
-		serverError(w, err)
-		return sessionUser{}, false
+		webutil.ServerError(w, err)
+		return auth.SessionUser{}, false
 	}
 	return user, true
 }
