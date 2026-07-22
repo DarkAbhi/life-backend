@@ -186,24 +186,16 @@ export default async function DashboardPage() {
           className="mt-12 max-w-xl rounded-2xl border border-border bg-card p-6 shadow-sm"
           aria-labelledby="next-month-heading"
         >
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2
-                className="text-lg font-semibold text-foreground"
-                id="next-month-heading"
-              >
-                Next month purchases
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                A small place for the things you&apos;ll need soon.
-              </p>
-            </div>
-            <Link
-              className="shrink-0 flex items-center gap-1.5 text-sm font-semibold text-primary"
-              href="/next-month"
+          <div>
+            <h2
+              className="text-lg font-semibold text-foreground"
+              id="next-month-heading"
             >
-              View all <ArrowRight className="h-4 w-4" />
-            </Link>
+              Next month purchases
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              A small place for the things you&apos;ll need soon. Managed in your Financial Horizon.
+            </p>
           </div>
           <NextMonthPurchaseForm />
         </section>

@@ -146,7 +146,7 @@ export async function addNextMonthPurchaseAction(
     }
 
     revalidatePath("/dashboard");
-    revalidatePath("/next-month");
+    revalidatePath("/financial-horizon");
     return { ok: true };
   } catch {
     return { ok: false, error: "We couldn't reach the server." };

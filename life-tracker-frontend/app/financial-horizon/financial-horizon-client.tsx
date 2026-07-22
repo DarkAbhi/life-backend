@@ -1,4 +1,3 @@
-"use me"; // standard client component
 "use client";
 
 import { useState, useTransition } from "react";
@@ -9,7 +8,6 @@ import {
   Plus,
   Trash2,
   Edit2,
-  Check,
   X,
   Home,
   TrendingUp,
@@ -22,19 +20,34 @@ import {
   Calendar,
   ToggleLeft,
   ToggleRight,
-  DollarSign,
+  ExternalLink,
+  ShoppingBag,
   ArrowUpRight,
+  MinusCircle,
 } from "lucide-react";
+import ConfirmationDialog from "../components/design-system/confirmation-dialog";
 import { HorizonSummary, DeductionItem } from "../dashboard/financial-horizon-card";
 import {
   updateHorizonConfigAction,
   addDeductionAction,
   updateDeductionAction,
   deleteDeductionAction,
+  addNextMonthPurchaseHorizonAction,
+  deleteNextMonthPurchaseAction,
+  clearAllNextMonthPurchasesAction,
 } from "./actions";
+
+export type NextMonthPurchaseItem = {
+  id: number;
+  name: string;
+  price: number;
+  url: string | null;
+};
 
 interface FinancialHorizonClientProps {
   initialSummary: HorizonSummary;
+  initialPurchases: NextMonthPurchaseItem[];
+  initialPurchasesTotal: number;
 }
 
 const CATEGORIES = [
@@ -48,21 +61,36 @@ const CATEGORIES = [
 
 export default function FinancialHorizonClient({
   initialSummary,
+  initialPurchases,
+  initialPurchasesTotal,
 }: FinancialHorizonClientProps) {
   const [summary, setSummary] = useState<HorizonSummary>(initialSummary);
+  const [purchases, setPurchases] = useState<NextMonthPurchaseItem[]>(initialPurchases);
+
+  // Edit base income state
   const [isEditingBase, setIsEditingBase] = useState(false);
   const [baseInput, setBaseInput] = useState(initialSummary.base_amount.toString());
   const [currencyInput, setCurrencyInput] = useState(initialSummary.currency);
   const [activeCategory, setActiveCategory] = useState<string>("all");
 
+  // Fixed Deduction Modal / Form state
   const [isAddingDeduction, setIsAddingDeduction] = useState(false);
   const [editingDeductionId, setEditingDeductionId] = useState<number | null>(null);
-
-  // Form states for Add/Edit deduction
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<string>("housing");
   const [dueDay, setDueDay] = useState<string>("");
+
+  // Next Month Purchase Add Form state
+  const [purchaseName, setPurchaseName] = useState("");
+  const [purchasePrice, setPurchasePrice] = useState("");
+  const [purchaseURL, setPurchaseURL] = useState("");
+
+  // Next Month Purchase Deletion modals
+  const [purchaseToDelete, setPurchaseToDelete] = useState<NextMonthPurchaseItem | null>(null);
+  const [deletingPurchaseID, setDeletingPurchaseID] = useState<number | null>(null);
+  const [isConfirmingClearAll, setIsConfirmingClearAll] = useState(false);
+  const [isClearingPurchases, setIsClearingPurchases] = useState(false);
 
   const [errorMsg, setErrorMsg] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -77,6 +105,22 @@ export default function FinancialHorizonClient({
       }
     );
   };
+
+  // Next month total
+  const purchasesTotal = purchases.reduce((sum, item) => sum + item.price, 0);
+
+  // Uncommitted Pool = Base - Fixed Deductions
+  const uncommittedPool = summary.base_amount - summary.total_deductions;
+
+  // Net Remaining Pool = Uncommitted Pool - Next Month Purchases Total
+  const netRemainingPool = uncommittedPool - purchasesTotal;
+
+  // Committed ratio including fixed deductions & planned purchases
+  const totalCommitted = summary.total_deductions + purchasesTotal;
+  const totalCommittedRatio =
+    summary.base_amount > 0
+      ? Math.round((totalCommitted / summary.base_amount) * 10000) / 100
+      : 0;
 
   const handleSaveBaseConfig = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +142,7 @@ export default function FinancialHorizonClient({
     });
   };
 
-  const handleOpenAddForm = () => {
+  const handleOpenAddDeductionForm = () => {
     setName("");
     setAmount("");
     setCategory("housing");
@@ -108,7 +152,7 @@ export default function FinancialHorizonClient({
     setEditingDeductionId(null);
   };
 
-  const handleOpenEditForm = (item: DeductionItem) => {
+  const handleOpenEditDeductionForm = (item: DeductionItem) => {
     setName(item.name);
     setAmount(item.amount.toString());
     setCategory(item.category);
@@ -118,7 +162,7 @@ export default function FinancialHorizonClient({
     setIsAddingDeduction(false);
   };
 
-  const handleCancelForm = () => {
+  const handleCancelDeductionForm = () => {
     setIsAddingDeduction(false);
     setEditingDeductionId(null);
     setErrorMsg("");
@@ -174,7 +218,7 @@ export default function FinancialHorizonClient({
     });
   };
 
-  const handleToggleActive = (item: DeductionItem) => {
+  const handleToggleDeductionActive = (item: DeductionItem) => {
     startTransition(async () => {
       const updatedActive = !item.is_active;
       const res = await updateDeductionAction(
@@ -216,20 +260,74 @@ export default function FinancialHorizonClient({
           ? Math.round((totalDeductions / prev.base_amount) * 10000) / 100
           : 0;
 
-      const projections = [
-        { months: 3, label: "3 Months", cumulative_uncommitted: Math.max(0, remainingAmount * 3) },
-        { months: 6, label: "6 Months", cumulative_uncommitted: Math.max(0, remainingAmount * 6) },
-        { months: 12, label: "1 Year", cumulative_uncommitted: Math.max(0, remainingAmount * 12) },
-      ];
-
       return {
         ...prev,
         total_deductions: totalDeductions,
         remaining_amount: remainingAmount,
         committed_ratio: committedRatio,
         deductions: newDeductions,
-        projections,
       };
+    });
+  };
+
+  // Next Month Purchase Handlers
+  const handleAddNextMonthPurchase = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+    const priceNum = parseFloat(purchasePrice);
+    if (!purchaseName.trim()) {
+      setErrorMsg("Item name is required.");
+      return;
+    }
+    if (isNaN(priceNum) || priceNum < 0) {
+      setErrorMsg("Please enter a valid non-negative price.");
+      return;
+    }
+
+    startTransition(async () => {
+      const res = await addNextMonthPurchaseHorizonAction(
+        purchaseName,
+        priceNum,
+        purchaseURL || null
+      );
+      if (res.ok && res.item) {
+        setPurchases((prev) => [res.item, ...prev]);
+        setPurchaseName("");
+        setPurchasePrice("");
+        setPurchaseURL("");
+      } else {
+        setErrorMsg(res.error ?? "Failed to add purchase item.");
+      }
+    });
+  };
+
+  const handleDeletePurchase = (item: NextMonthPurchaseItem) => {
+    setErrorMsg("");
+    setDeletingPurchaseID(item.id);
+    startTransition(async () => {
+      const res = await deleteNextMonthPurchaseAction(item.id);
+      if (res.ok) {
+        setPurchases((prev) => prev.filter((p) => p.id !== item.id));
+        setPurchaseToDelete(null);
+      } else {
+        setErrorMsg(res.error ?? "Failed to delete purchase.");
+      }
+      setDeletingPurchaseID(null);
+    });
+  };
+
+  const handleClearAllPurchases = () => {
+    setErrorMsg("");
+    setIsClearingPurchases(true);
+    startTransition(async () => {
+      const res = await clearAllNextMonthPurchasesAction();
+      if (res.ok) {
+        setPurchases([]);
+        setIsConfirmingClearAll(false);
+      } else {
+        setErrorMsg(res.error ?? "Failed to clear purchases.");
+      }
+      setIsClearingPurchases(false);
     });
   };
 
@@ -237,7 +335,7 @@ export default function FinancialHorizonClient({
     activeCategory === "all" ? true : d.category === activeCategory
   );
 
-  const activeCount = summary.deductions.filter((d) => d.is_active).length;
+  const activeDeductionsCount = summary.deductions.filter((d) => d.is_active).length;
 
   return (
     <main className="min-h-screen bg-background px-6 py-10 text-foreground sm:px-10 lg:px-16">
@@ -261,12 +359,12 @@ export default function FinancialHorizonClient({
                 </h1>
               </div>
               <p className="mt-2 text-sm text-muted-foreground max-w-2xl">
-                Your month&apos;s starting line calculator. Subtract your non-negotiable fixed obligations from your base income to uncover your exact uncommitted cash flow.
+                Your month&apos;s starting line calculator. Subtracts fixed obligations and next month&apos;s planned purchases from base income to reveal your exact net uncommitted cash pool.
               </p>
             </div>
 
             <button
-              onClick={handleOpenAddForm}
+              onClick={handleOpenAddDeductionForm}
               disabled={isPending}
               className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow transition hover:opacity-90 active:scale-95 disabled:opacity-50"
             >
@@ -287,31 +385,31 @@ export default function FinancialHorizonClient({
           </div>
         )}
 
-        {/* Hero KPI Metrics */}
-        <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Card A: Base Monthly Income */}
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm relative overflow-hidden transition duration-200 hover:shadow-md">
+        {/* Hero KPI Metrics Cards */}
+        <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+          {/* Card 1: Base Monthly Income (Input A) */}
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm relative overflow-hidden transition duration-200 hover:shadow-md">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Base Income (Input A)
+                Base Income (A)
               </span>
               <button
                 onClick={() => setIsEditingBase(!isEditingBase)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition"
+                className="rounded-lg p-1 text-muted-foreground hover:bg-secondary hover:text-foreground transition"
                 title="Edit Base Income"
               >
-                <Edit2 className="h-4 w-4" />
+                <Edit2 className="h-3.5 w-3.5" />
               </button>
             </div>
 
             {isEditingBase ? (
-              <form onSubmit={handleSaveBaseConfig} className="mt-3 space-y-3">
-                <div className="flex gap-2">
+              <form onSubmit={handleSaveBaseConfig} className="mt-2 space-y-2">
+                <div className="flex gap-1.5">
                   <input
                     type="text"
                     value={currencyInput}
                     onChange={(e) => setCurrencyInput(e.target.value)}
-                    className="w-12 rounded-lg border border-border bg-background px-2 py-1 text-center text-sm font-bold"
+                    className="w-10 rounded-lg border border-border bg-background px-1.5 py-1 text-center text-xs font-bold"
                     placeholder="₹"
                   />
                   <input
@@ -320,116 +418,238 @@ export default function FinancialHorizonClient({
                     min="0"
                     value={baseInput}
                     onChange={(e) => setBaseInput(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-1 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="100000"
                     autoFocus
                   />
                 </div>
-                <div className="flex gap-2 justify-end">
+                <div className="flex gap-1.5 justify-end">
                   <button
                     type="button"
                     onClick={() => setIsEditingBase(false)}
-                    className="rounded-lg px-2.5 py-1 text-xs font-medium border border-border hover:bg-secondary"
+                    className="rounded-lg px-2 py-0.5 text-xs font-medium border border-border hover:bg-secondary"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isPending}
-                    className="rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground hover:opacity-90"
+                    className="rounded-lg bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
                   >
                     Save
                   </button>
                 </div>
               </form>
             ) : (
-              <div className="mt-3">
-                <p className="text-2xl font-extrabold text-foreground">
+              <div className="mt-2.5">
+                <p className="text-xl font-extrabold text-foreground">
                   {summary.currency}
                   {summary.base_amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Fixed starting monthly pool
-                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Starting monthly pool</p>
               </div>
             )}
           </div>
 
-          {/* Card B: Fixed Obligations */}
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm transition duration-200 hover:shadow-md">
+          {/* Card 2: Fixed Deductions (Input B) */}
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm transition duration-200 hover:shadow-md">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Fixed Deductions (Input B)
+                Fixed Obligations (B)
               </span>
               <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
-                {activeCount} active
+                {activeDeductionsCount} active
               </span>
             </div>
-            <div className="mt-3">
-              <p className="text-2xl font-extrabold text-foreground">
+            <div className="mt-2.5">
+              <p className="text-xl font-extrabold text-foreground">
                 {summary.currency}
                 {summary.total_deductions.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Recurring non-negotiable expenses
+              <p className="mt-0.5 text-xs text-muted-foreground">Non-negotiable fixed bills</p>
+            </div>
+          </div>
+
+          {/* Card 3: Next Month Purchases (Input C) */}
+          <div className="rounded-2xl border border-border bg-amber-500/5 p-5 shadow-sm transition duration-200 hover:shadow-md">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                Next Month Purchases (C)
+              </span>
+              <ShoppingBag className="h-4 w-4 text-amber-500" />
+            </div>
+            <div className="mt-2.5">
+              <p className="text-xl font-extrabold text-amber-600 dark:text-amber-400">
+                {summary.currency}
+                {purchasesTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {purchases.length} planned purchase{purchases.length === 1 ? "" : "s"}
               </p>
             </div>
           </div>
 
-          {/* Card C: Uncommitted Income Pool */}
-          <div className="rounded-2xl border border-border bg-gradient-to-br from-card to-emerald-500/5 p-6 shadow-sm transition duration-200 hover:shadow-md">
+          {/* Card 4: Net Uncommitted Pool (Result: A - B - C) */}
+          <div className="rounded-2xl border border-border bg-gradient-to-br from-card to-emerald-500/10 p-5 shadow-sm transition duration-200 hover:shadow-md">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Uncommitted Pool (Result)
+                Net Available Pool (A-B-C)
               </span>
               <Sparkles className="h-4 w-4 text-emerald-500" />
             </div>
-            <div className="mt-3">
+            <div className="mt-2.5">
               <p
-                className={`text-2xl font-extrabold ${
-                  summary.remaining_amount >= 0
+                className={`text-xl font-extrabold ${
+                  netRemainingPool >= 0
                     ? "text-emerald-600 dark:text-emerald-400"
                     : "text-rose-600 dark:text-rose-400"
                 }`}
               >
                 {summary.currency}
-                {summary.remaining_amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                {netRemainingPool.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Free pool for variable spending & savings
-              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Net cash after all obligations</p>
             </div>
           </div>
 
-          {/* Card D: Committed Ratio */}
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm transition duration-200 hover:shadow-md">
+          {/* Card 5: Committed Allocation Ratio */}
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm transition duration-200 hover:shadow-md">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Committed Ratio
+                Total Allocated
               </span>
               <PieChart className="h-4 w-4 text-muted-foreground" />
             </div>
-            <div className="mt-3">
-              <p className="text-2xl font-extrabold text-foreground">
-                {summary.committed_ratio.toFixed(1)}%
+            <div className="mt-2.5">
+              <p className="text-xl font-extrabold text-foreground">
+                {totalCommittedRatio.toFixed(1)}%
               </p>
-              <div className="mt-2.5 h-2 w-full rounded-full bg-secondary overflow-hidden">
+              <div className="mt-2 h-2 w-full rounded-full bg-secondary overflow-hidden">
                 <div
                   className={`h-full transition-all duration-500 ${
-                    summary.committed_ratio > 80
+                    totalCommittedRatio > 80
                       ? "bg-rose-500"
-                      : summary.committed_ratio > 50
+                      : totalCommittedRatio > 50
                       ? "bg-amber-500"
                       : "bg-emerald-500"
                   }`}
-                  style={{ width: `${Math.min(100, Math.max(0, summary.committed_ratio))}%` }}
+                  style={{ width: `${Math.min(100, Math.max(0, totalCommittedRatio))}%` }}
                 />
               </div>
             </div>
           </div>
         </section>
 
-        {/* Add/Edit Form Inline Modal */}
+        {/* Next Month Purchases Management Section */}
+        <section className="rounded-3xl border border-border bg-card p-6 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <ShoppingBag className="h-5 w-5 text-amber-500" />
+                <h2 className="text-xl font-bold text-foreground">Next Month Planned Purchases</h2>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Planned variable purchases subtracted directly from your uncommitted pool for next month.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                Total Planned: {summary.currency}{purchasesTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </div>
+
+              {purchases.length > 0 && (
+                <button
+                  onClick={() => setIsConfirmingClearAll(true)}
+                  disabled={isPending || isClearingPurchases}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-destructive/40 px-3 py-1.5 text-xs font-semibold text-destructive transition hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Clear All
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Add Next Month Purchase Form */}
+          <form onSubmit={handleAddNextMonthPurchase} className="grid gap-3 sm:grid-cols-3">
+            <input
+              type="text"
+              required
+              placeholder="Item name (e.g. Headphones)"
+              value={purchaseName}
+              onChange={(e) => setPurchaseName(e.target.value)}
+              className="rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              required
+              placeholder={`Price (${summary.currency})`}
+              value={purchasePrice}
+              onChange={(e) => setPurchasePrice(e.target.value)}
+              className="rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <input
+              type="url"
+              placeholder="Optional URL (https://...)"
+              value={purchaseURL}
+              onChange={(e) => setPurchaseURL(e.target.value)}
+              className="rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <button
+              type="submit"
+              disabled={isPending}
+              className="sm:col-span-3 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow transition hover:opacity-90 active:scale-95 disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" /> Add Next Month Purchase
+            </button>
+          </form>
+
+          {/* List of Next Month Purchases */}
+          {purchases.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-background/50 p-6 text-center text-sm text-muted-foreground">
+              No planned purchases added for next month yet.
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {purchases.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-background p-4 shadow-sm transition hover:shadow-md"
+                >
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-semibold text-foreground text-sm truncate">{item.name}</h4>
+                    {item.url && (
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      >
+                        Link <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="font-bold text-foreground text-sm">
+                      {summary.currency}{item.price.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </span>
+                    <button
+                      onClick={() => setPurchaseToDelete(item)}
+                      className="rounded-lg p-1.5 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 transition"
+                      title="Delete purchase"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Add/Edit Deduction Modal / Form */}
         {(isAddingDeduction || editingDeductionId !== null) && (
           <section className="rounded-2xl border border-primary/30 bg-card p-6 shadow-md transition duration-200">
             <div className="flex items-center justify-between mb-4">
@@ -437,7 +657,7 @@ export default function FinancialHorizonClient({
                 {editingDeductionId !== null ? "Edit Fixed Obligation" : "Add Fixed Obligation"}
               </h3>
               <button
-                onClick={handleCancelForm}
+                onClick={handleCancelDeductionForm}
                 className="rounded-lg p-1 text-muted-foreground hover:bg-secondary"
               >
                 <X className="h-5 w-5" />
@@ -502,7 +722,7 @@ export default function FinancialHorizonClient({
               <div className="sm:col-span-2 lg:col-span-4 flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={handleCancelForm}
+                  onClick={handleCancelDeductionForm}
                   className="rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:bg-secondary"
                 >
                   Cancel
@@ -519,7 +739,7 @@ export default function FinancialHorizonClient({
           </section>
         )}
 
-        {/* Obligations List Section */}
+        {/* Fixed Obligations List Section */}
         <section className="space-y-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -568,7 +788,7 @@ export default function FinancialHorizonClient({
                 Add your rent, SIP investments, bills, or debt EMIs to calculate your exact baseline.
               </p>
               <button
-                onClick={handleOpenAddForm}
+                onClick={handleOpenAddDeductionForm}
                 className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow hover:opacity-90"
               >
                 <Plus className="h-4 w-4" /> Add Obligation
@@ -603,7 +823,7 @@ export default function FinancialHorizonClient({
                       </div>
 
                       <button
-                        onClick={() => handleToggleActive(item)}
+                        onClick={() => handleToggleDeductionActive(item)}
                         className="text-muted-foreground hover:text-foreground transition"
                         title={item.is_active ? "Deactivate obligation" : "Activate obligation"}
                       >
@@ -634,7 +854,7 @@ export default function FinancialHorizonClient({
 
                     <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/50 pt-3">
                       <button
-                        onClick={() => handleOpenEditForm(item)}
+                        onClick={() => handleOpenEditDeductionForm(item)}
                         className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition"
                         title="Edit obligation"
                       >
@@ -664,37 +884,71 @@ export default function FinancialHorizonClient({
             <div>
               <h2 className="text-xl font-bold text-foreground">Future Horizon Projections</h2>
               <p className="text-sm text-muted-foreground">
-                Projected uncommitted cash pool accumulation based on maintaining your current baseline.
+                Projected uncommitted cash pool accumulation based on maintaining your baseline uncommitted cash flow.
               </p>
             </div>
           </div>
 
           <div className="mt-6 grid gap-5 sm:grid-cols-3">
-            {summary.projections.map((proj) => (
-              <div
-                key={proj.months}
-                className="rounded-2xl border border-border bg-card/80 p-6 shadow-sm backdrop-blur-sm transition duration-200 hover:-translate-y-1 hover:shadow-md"
-              >
-                <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  <span>{proj.label} Horizon</span>
-                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-600 dark:text-emerald-400 font-bold">
-                    {proj.months} Months
-                  </span>
+            {[3, 6, 12].map((months) => {
+              const label = months === 12 ? "1 Year" : `${months} Months`;
+              const projectedReserve = Math.max(0, netRemainingPool * months);
+
+              return (
+                <div
+                  key={months}
+                  className="rounded-2xl border border-border bg-card/80 p-6 shadow-sm backdrop-blur-sm transition duration-200 hover:-translate-y-1 hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <span>{label} Horizon</span>
+                    <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-600 dark:text-emerald-400 font-bold">
+                      {months} Months
+                    </span>
+                  </div>
+
+                  <p className="mt-4 text-2xl font-extrabold text-foreground">
+                    {summary.currency}
+                    {projectedReserve.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  </p>
+
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Estimated net uncommitted reserve pool accumulated over {months} months.
+                  </p>
                 </div>
-
-                <p className="mt-4 text-2xl font-extrabold text-foreground">
-                  {summary.currency}
-                  {proj.cumulative_uncommitted.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                </p>
-
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Estimated uncommitted reserve pool accumulated over {proj.months} months.
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       </div>
+
+      {/* Confirmation Dialogs for Purchase Deletions */}
+      <ConfirmationDialog
+        isOpen={!!purchaseToDelete}
+        onClose={() => setPurchaseToDelete(null)}
+        onConfirm={() => {
+          if (purchaseToDelete) handleDeletePurchase(purchaseToDelete);
+        }}
+        title={purchaseToDelete ? `Delete ${purchaseToDelete.name}?` : ""}
+        description="This permanently removes it from your next month purchases."
+        confirmText="Delete purchase"
+        confirmLoadingText="Deleting…"
+        isLoading={deletingPurchaseID !== null}
+        error={errorMsg}
+        variant="destructive"
+      />
+
+      <ConfirmationDialog
+        isOpen={isConfirmingClearAll}
+        onClose={() => setIsConfirmingClearAll(false)}
+        onConfirm={handleClearAllPurchases}
+        title="Clear all next month purchases?"
+        description={`This permanently removes all ${purchases.length} planned purchase${purchases.length === 1 ? "" : "s"}.`}
+        confirmText="Clear all"
+        confirmLoadingText="Clearing…"
+        isLoading={isClearingPurchases}
+        error={errorMsg}
+        variant="destructive"
+      />
     </main>
   );
 }

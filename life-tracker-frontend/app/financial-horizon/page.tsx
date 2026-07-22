@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import FinancialHorizonClient from "./financial-horizon-client";
+import FinancialHorizonClient, { NextMonthPurchaseItem } from "./financial-horizon-client";
 import { HorizonSummary } from "../dashboard/financial-horizon-card";
 
 export const metadata = {
@@ -28,14 +28,17 @@ export default async function FinancialHorizonPage() {
     redirect("/");
   }
 
-  // Fetch financial horizon details
-  const response = await fetch(`${apiBaseURL}/api/horizon`, {
-    headers: {
-      Cookie: cookieHeader,
-    },
-  });
+  // Fetch financial horizon details and next month purchases in parallel
+  const [horizonRes, purchasesRes] = await Promise.all([
+    fetch(`${apiBaseURL}/api/horizon`, {
+      headers: { Cookie: cookieHeader },
+    }),
+    fetch(`${apiBaseURL}/api/next-month-purchases`, {
+      headers: { Cookie: cookieHeader },
+    }),
+  ]);
 
-  if (!response.ok) {
+  if (!horizonRes.ok) {
     return (
       <main className="min-h-screen bg-background px-6 py-10 text-foreground sm:px-10">
         <div className="mx-auto max-w-4xl">
@@ -56,7 +59,22 @@ export default async function FinancialHorizonPage() {
     );
   }
 
-  const initialSummary = (await response.json()) as HorizonSummary;
+  const initialSummary = (await horizonRes.json()) as HorizonSummary;
 
-  return <FinancialHorizonClient initialSummary={initialSummary} />;
+  let initialPurchases: NextMonthPurchaseItem[] = [];
+  let initialPurchasesTotal = 0;
+
+  if (purchasesRes.ok) {
+    const purchasesData = (await purchasesRes.json()) as { items: NextMonthPurchaseItem[]; total: number };
+    initialPurchases = purchasesData.items ?? [];
+    initialPurchasesTotal = purchasesData.total ?? 0;
+  }
+
+  return (
+    <FinancialHorizonClient
+      initialSummary={initialSummary}
+      initialPurchases={initialPurchases}
+      initialPurchasesTotal={initialPurchasesTotal}
+    />
+  );
 }
