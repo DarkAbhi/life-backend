@@ -7,6 +7,7 @@ import GymVisitCard from "./gym-visit-card";
 import NotificationCenter from "./notification-center";
 import NextMonthPurchaseForm from "./next-month-purchase-form";
 import NamePromptDialog from "./name-prompt-dialog";
+import FinancialHorizonCard, { HorizonSummary } from "./financial-horizon-card";
 import { AppNotification } from "../components/notification-list";
 
 export const metadata = {
@@ -43,9 +44,11 @@ export default async function DashboardPage() {
   let gymVisitID: number | null = null;
   let notifications: AppNotification[] = [];
   let notificationsError = "";
+  let horizonSummary: HorizonSummary | null = null;
+  let horizonError = "";
 
   try {
-    const [profileRes, gymRes, notificationsRes] = await Promise.all([
+    const [profileRes, gymRes, notificationsRes, horizonRes] = await Promise.all([
       fetch(`${apiBaseURL}/api/profile`, {
         headers: { Cookie: cookieHeader },
       }),
@@ -53,6 +56,9 @@ export default async function DashboardPage() {
         headers: { Cookie: cookieHeader },
       }),
       fetch(`${apiBaseURL}/api/notifications?limit=5`, {
+        headers: { Cookie: cookieHeader },
+      }),
+      fetch(`${apiBaseURL}/api/horizon`, {
         headers: { Cookie: cookieHeader },
       }),
     ]);
@@ -72,6 +78,12 @@ export default async function DashboardPage() {
       notifications = (await notificationsRes.json()) as AppNotification[];
     } else {
       notificationsError = "We couldn't load your notifications.";
+    }
+
+    if (horizonRes.ok) {
+      horizonSummary = (await horizonRes.json()) as HorizonSummary;
+    } else {
+      horizonError = "We couldn't load your financial horizon.";
     }
   } catch {
     redirect("/");
@@ -133,6 +145,8 @@ export default async function DashboardPage() {
             </Link>
 
             <GymVisitCard initialVisited={gymVisited} initialVisitID={gymVisitID} />
+
+            <FinancialHorizonCard summary={horizonSummary} error={horizonError} />
           </div>
         </section>
 

@@ -11,6 +11,7 @@ import (
 	"github.com/DarkAbhi/life-backend/internal/auth"
 	"github.com/DarkAbhi/life-backend/internal/gym"
 	"github.com/DarkAbhi/life-backend/internal/health"
+	"github.com/DarkAbhi/life-backend/internal/horizon"
 	"github.com/DarkAbhi/life-backend/internal/meditation"
 	"github.com/DarkAbhi/life-backend/internal/notification"
 	"github.com/DarkAbhi/life-backend/internal/profile"
@@ -39,6 +40,7 @@ func (a *API) Router() http.Handler {
 	meditationHandler := meditation.NewHandler(a.DB)
 	sportHandler := sport.NewHandler(a.DB)
 	vehicleHandler := vehicle.NewHandler(a.DB)
+	horizonHandler := horizon.NewHandler(a.DB)
 
 	// Health (outside /api so Docker or Kubernetes health probes stay simple)
 	r.Get("/healthz", healthHandler.Healthz) // liveness
@@ -59,6 +61,13 @@ func (a *API) Router() http.Handler {
 		api.Post("/next-month-purchases", purchaseHandler.CreateNextMonthPurchase)
 		api.Delete("/next-month-purchases", purchaseHandler.ClearNextMonthPurchases)
 		api.Delete("/next-month-purchases/{id}", purchaseHandler.DeleteNextMonthPurchase)
+
+		// Financial Horizon
+		api.Get("/horizon", horizonHandler.GetHorizon)
+		api.Put("/horizon/config", horizonHandler.UpdateConfig)
+		api.Post("/horizon/deductions", horizonHandler.CreateDeduction)
+		api.Put("/horizon/deductions/{id}", horizonHandler.UpdateDeduction)
+		api.Delete("/horizon/deductions/{id}", horizonHandler.DeleteDeduction)
 		// Daily logs
 		api.Get("/workout/today", gymHandler.GymVisitedToday)
 		api.Post("/workout/today", gymHandler.AddWorkoutForDay)
