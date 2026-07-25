@@ -32,6 +32,7 @@ import {
 import ConfirmationDialog from "../components/design-system/confirmation-dialog";
 import TransactionDialog from "./transaction-dialog";
 import CategoryDialog from "./category-dialog";
+import BudgetDialog from "./budget-dialog";
 import { HorizonSummary, DeductionItem, BudgetItem, CategoryItem, TransactionItem } from "../dashboard/financial-horizon-card";
 import {
   updateHorizonConfigAction,
@@ -89,11 +90,9 @@ export default function FinancialHorizonClient({
   const [currencyInput, setCurrencyInput] = useState(initialSummary.currency);
   const [activeCategory, setActiveCategory] = useState<string>("all");
 
-  // Budget Form State
-  const [isAddingBudget, setIsAddingBudget] = useState(false);
-  const [editingBudgetId, setEditingBudgetId] = useState<number | null>(null);
-  const [budgetName, setBudgetName] = useState("");
-  const [budgetAllocated, setBudgetAllocated] = useState("");
+  // Budget Form & Dialog State
+  const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<BudgetItem | null>(null);
   const [budgetToDelete, setBudgetToDelete] = useState<BudgetItem | null>(null);
   const [deletingBudgetId, setDeletingBudgetId] = useState<number | null>(null);
 
@@ -183,25 +182,13 @@ export default function FinancialHorizonClient({
 
   // Budget Handlers
   const handleOpenAddBudgetForm = () => {
-    setBudgetName("");
-    setBudgetAllocated("");
-    setErrorMsg("");
-    setIsAddingBudget(true);
-    setEditingBudgetId(null);
+    setEditingBudget(null);
+    setIsBudgetDialogOpen(true);
   };
 
   const handleOpenEditBudgetForm = (b: BudgetItem) => {
-    setBudgetName(b.name);
-    setBudgetAllocated(b.allocated_amount.toString());
-    setErrorMsg("");
-    setEditingBudgetId(b.id);
-    setIsAddingBudget(false);
-  };
-
-  const handleCancelBudgetForm = () => {
-    setIsAddingBudget(false);
-    setEditingBudgetId(null);
-    setErrorMsg("");
+    setEditingBudget(b);
+    setIsBudgetDialogOpen(true);
   };
 
   const recalculateSummary = ({
@@ -275,38 +262,28 @@ export default function FinancialHorizonClient({
     });
   };
 
-  const handleSaveBudget = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveBudget = async (data: { id?: number; name: string; allocatedAmount: number }) => {
     setErrorMsg("");
-    const parsedAllocated = parseFloat(budgetAllocated);
-    if (!budgetName.trim()) {
-      setErrorMsg("Budget name is required.");
-      return;
-    }
-    if (isNaN(parsedAllocated) || parsedAllocated < 0) {
-      setErrorMsg("Please enter a valid non-negative allocated amount.");
-      return;
-    }
-
     startTransition(async () => {
-      if (editingBudgetId !== null) {
-        const res = await updateBudgetAction(editingBudgetId, budgetName, parsedAllocated);
+      if (data.id) {
+        const res = await updateBudgetAction(data.id, data.name, data.allocatedAmount);
         if (res.ok && res.budget) {
           recalculateSummary({
             budgetsUpdater: (prev) =>
-              prev.map((b) => (b.id === editingBudgetId ? res.budget : b)),
+              prev.map((b) => (b.id === data.id ? res.budget : b)),
           });
-          setEditingBudgetId(null);
+          setIsBudgetDialogOpen(false);
+          setEditingBudget(null);
         } else {
           setErrorMsg(res.error ?? "Failed to update budget.");
         }
       } else {
-        const res = await addBudgetAction(budgetName, parsedAllocated);
+        const res = await addBudgetAction(data.name, data.allocatedAmount);
         if (res.ok && res.budget) {
           recalculateSummary({
             budgetsUpdater: (prev) => [...prev, res.budget],
           });
-          setIsAddingBudget(false);
+          setIsBudgetDialogOpen(false);
         } else {
           setErrorMsg(res.error ?? "Failed to add budget.");
         }
@@ -825,71 +802,6 @@ export default function FinancialHorizonClient({
             </div>
           </div>
         </section>
-
-        {/* Add/Edit Budget Modal / Form */}
-        {(isAddingBudget || editingBudgetId !== null) && (
-          <section className="rounded-2xl border border-primary/30 bg-card p-6 shadow-md transition duration-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-bold text-foreground">
-                  {editingBudgetId !== null ? "Edit Monthly Budget" : "Create Monthly Budget"}
-                </h3>
-              </div>
-              <button
-                onClick={handleCancelBudgetForm}
-                className="rounded-lg p-1 text-muted-foreground hover:bg-secondary"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveBudget} className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Budget Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Housing & Utilities, Subscriptions, Personal Spending"
-                  value={budgetName}
-                  onChange={(e) => setBudgetName(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Monthly Allocated Amount ({summary.currency})</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  required
-                  placeholder="0.00"
-                  value={budgetAllocated}
-                  onChange={(e) => setBudgetAllocated(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              <div className="sm:col-span-2 flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handleCancelBudgetForm}
-                  className="rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:bg-secondary"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 shadow"
-                >
-                  {editingBudgetId !== null ? "Update Budget" : "Save Budget"}
-                </button>
-              </div>
-            </form>
-          </section>
-        )}
 
         {/* Monthly Budgets Section */}
         <section className="space-y-6">
@@ -1700,6 +1612,19 @@ export default function FinancialHorizonClient({
         isOpen={isCategoryDialogOpen}
         onClose={() => setIsCategoryDialogOpen(false)}
         onSave={handleSaveCategory}
+        isPending={isPending}
+      />
+
+      {/* Budget Entry Dialog */}
+      <BudgetDialog
+        isOpen={isBudgetDialogOpen}
+        onClose={() => {
+          setIsBudgetDialogOpen(false);
+          setEditingBudget(null);
+        }}
+        onSave={handleSaveBudget}
+        editingBudget={editingBudget}
+        currency={summary.currency}
         isPending={isPending}
       />
     </main>
