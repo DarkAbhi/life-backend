@@ -23,10 +23,11 @@ import {
   ExternalLink,
   ShoppingBag,
   ArrowUpRight,
-  MinusCircle,
+  Target,
+  Wallet,
 } from "lucide-react";
 import ConfirmationDialog from "../components/design-system/confirmation-dialog";
-import { HorizonSummary, DeductionItem } from "../dashboard/financial-horizon-card";
+import { HorizonSummary, DeductionItem, BudgetItem } from "../dashboard/financial-horizon-card";
 import {
   updateHorizonConfigAction,
   addDeductionAction,
@@ -35,6 +36,9 @@ import {
   addNextMonthPurchaseHorizonAction,
   deleteNextMonthPurchaseAction,
   clearAllNextMonthPurchasesAction,
+  addBudgetAction,
+  updateBudgetAction,
+  deleteBudgetAction,
 } from "./actions";
 
 export type NextMonthPurchaseItem = {
@@ -64,7 +68,10 @@ export default function FinancialHorizonClient({
   initialPurchases,
   initialPurchasesTotal,
 }: FinancialHorizonClientProps) {
-  const [summary, setSummary] = useState<HorizonSummary>(initialSummary);
+  const [summary, setSummary] = useState<HorizonSummary>({
+    ...initialSummary,
+    budgets: initialSummary.budgets ?? [],
+  });
   const [purchases, setPurchases] = useState<NextMonthPurchaseItem[]>(initialPurchases);
 
   // Edit base income state
@@ -73,13 +80,22 @@ export default function FinancialHorizonClient({
   const [currencyInput, setCurrencyInput] = useState(initialSummary.currency);
   const [activeCategory, setActiveCategory] = useState<string>("all");
 
-  // Fixed Deduction Modal / Form state
+  // Budget Form State
+  const [isAddingBudget, setIsAddingBudget] = useState(false);
+  const [editingBudgetId, setEditingBudgetId] = useState<number | null>(null);
+  const [budgetName, setBudgetName] = useState("");
+  const [budgetAllocated, setBudgetAllocated] = useState("");
+  const [budgetToDelete, setBudgetToDelete] = useState<BudgetItem | null>(null);
+  const [deletingBudgetId, setDeletingBudgetId] = useState<number | null>(null);
+
+  // Fixed Deduction Form State
   const [isAddingDeduction, setIsAddingDeduction] = useState(false);
   const [editingDeductionId, setEditingDeductionId] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<string>("housing");
   const [dueDay, setDueDay] = useState<string>("");
+  const [selectedBudgetId, setSelectedBudgetId] = useState<number | null>(null);
 
   // Next Month Purchase Add Form state
   const [purchaseName, setPurchaseName] = useState("");
@@ -134,7 +150,10 @@ export default function FinancialHorizonClient({
     startTransition(async () => {
       const res = await updateHorizonConfigAction(parsedAmount, currencyInput);
       if (res.ok && res.summary) {
-        setSummary(res.summary);
+        setSummary({
+          ...res.summary,
+          budgets: res.summary.budgets ?? [],
+        });
         setIsEditingBase(false);
       } else {
         setErrorMsg(res.error ?? "Failed to update starting pool.");
@@ -142,11 +161,107 @@ export default function FinancialHorizonClient({
     });
   };
 
+  // Budget Handlers
+  const handleOpenAddBudgetForm = () => {
+    setBudgetName("");
+    setBudgetAllocated("");
+    setErrorMsg("");
+    setIsAddingBudget(true);
+    setEditingBudgetId(null);
+  };
+
+  const handleOpenEditBudgetForm = (b: BudgetItem) => {
+    setBudgetName(b.name);
+    setBudgetAllocated(b.allocated_amount.toString());
+    setErrorMsg("");
+    setEditingBudgetId(b.id);
+    setIsAddingBudget(false);
+  };
+
+  const handleCancelBudgetForm = () => {
+    setIsAddingBudget(false);
+    setEditingBudgetId(null);
+    setErrorMsg("");
+  };
+
+  const handleSaveBudget = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+    const parsedAllocated = parseFloat(budgetAllocated);
+    if (!budgetName.trim()) {
+      setErrorMsg("Budget name is required.");
+      return;
+    }
+    if (isNaN(parsedAllocated) || parsedAllocated < 0) {
+      setErrorMsg("Please enter a valid non-negative allocated amount.");
+      return;
+    }
+
+    startTransition(async () => {
+      if (editingBudgetId !== null) {
+        const res = await updateBudgetAction(editingBudgetId, budgetName, parsedAllocated);
+        if (res.ok && res.budget) {
+          setSummary((prev) => {
+            const updatedBudgets = (prev.budgets ?? []).map((b) =>
+              b.id === editingBudgetId ? res.budget : b
+            );
+            const totalAllocated = updatedBudgets.reduce((sum, b) => sum + b.allocated_amount, 0);
+            return { ...prev, budgets: updatedBudgets, total_budgets_allocated: totalAllocated };
+          });
+          setEditingBudgetId(null);
+        } else {
+          setErrorMsg(res.error ?? "Failed to update budget.");
+        }
+      } else {
+        const res = await addBudgetAction(budgetName, parsedAllocated);
+        if (res.ok && res.budget) {
+          setSummary((prev) => {
+            const updatedBudgets = [...(prev.budgets ?? []), res.budget];
+            const totalAllocated = updatedBudgets.reduce((sum, b) => sum + b.allocated_amount, 0);
+            return { ...prev, budgets: updatedBudgets, total_budgets_allocated: totalAllocated };
+          });
+          setIsAddingBudget(false);
+        } else {
+          setErrorMsg(res.error ?? "Failed to add budget.");
+        }
+      }
+    });
+  };
+
+  const handleDeleteBudget = (id: number) => {
+    setErrorMsg("");
+    setDeletingBudgetId(id);
+    startTransition(async () => {
+      const res = await deleteBudgetAction(id);
+      if (res.ok) {
+        setSummary((prev) => {
+          const updatedBudgets = (prev.budgets ?? []).filter((b) => b.id !== id);
+          const updatedDeductions = prev.deductions.map((d) =>
+            d.budget_id === id ? { ...d, budget_id: null } : d
+          );
+          const totalAllocated = updatedBudgets.reduce((sum, b) => sum + b.allocated_amount, 0);
+          return {
+            ...prev,
+            budgets: updatedBudgets,
+            deductions: updatedDeductions,
+            total_budgets_allocated: totalAllocated,
+          };
+        });
+        setBudgetToDelete(null);
+      } else {
+        setErrorMsg(res.error ?? "Failed to delete budget.");
+      }
+      setDeletingBudgetId(null);
+    });
+  };
+
+  // Fixed Obligation Handlers
   const handleOpenAddDeductionForm = () => {
     setName("");
     setAmount("");
     setCategory("housing");
     setDueDay("");
+    setSelectedBudgetId(null);
     setErrorMsg("");
     setIsAddingDeduction(true);
     setEditingDeductionId(null);
@@ -157,6 +272,7 @@ export default function FinancialHorizonClient({
     setAmount(item.amount.toString());
     setCategory(item.category);
     setDueDay(item.due_day ? item.due_day.toString() : "");
+    setSelectedBudgetId(item.budget_id ?? null);
     setErrorMsg("");
     setEditingDeductionId(item.id);
     setIsAddingDeduction(false);
@@ -165,6 +281,7 @@ export default function FinancialHorizonClient({
   const handleCancelDeductionForm = () => {
     setIsAddingDeduction(false);
     setEditingDeductionId(null);
+    setSelectedBudgetId(null);
     setErrorMsg("");
   };
 
@@ -196,21 +313,30 @@ export default function FinancialHorizonClient({
           category,
           parsedAmount,
           parsedDueDay,
-          existing ? existing.is_active : true
+          existing ? existing.is_active : true,
+          selectedBudgetId
         );
         if (res.ok && res.deduction) {
           recalculateSummary((prev) =>
             prev.map((d) => (d.id === editingDeductionId ? res.deduction : d))
           );
           setEditingDeductionId(null);
+          setSelectedBudgetId(null);
         } else {
           setErrorMsg(res.error ?? "Failed to update item.");
         }
       } else {
-        const res = await addDeductionAction(name, category, parsedAmount, parsedDueDay);
+        const res = await addDeductionAction(
+          name,
+          category,
+          parsedAmount,
+          parsedDueDay,
+          selectedBudgetId
+        );
         if (res.ok && res.deduction) {
           recalculateSummary((prev) => [res.deduction, ...prev]);
           setIsAddingDeduction(false);
+          setSelectedBudgetId(null);
         } else {
           setErrorMsg(res.error ?? "Failed to add item.");
         }
@@ -227,7 +353,8 @@ export default function FinancialHorizonClient({
         item.category,
         item.amount,
         item.due_day,
-        updatedActive
+        updatedActive,
+        item.budget_id ?? null
       );
       if (res.ok && res.deduction) {
         recalculateSummary((prev) =>
@@ -260,12 +387,36 @@ export default function FinancialHorizonClient({
           ? Math.round((totalDeductions / prev.base_amount) * 10000) / 100
           : 0;
 
+      // Recalculate budget used amounts from active deductions
+      const budgetUsedMap: Record<number, number> = {};
+      newDeductions.forEach((d) => {
+        if (d.is_active && d.budget_id) {
+          budgetUsedMap[d.budget_id] = (budgetUsedMap[d.budget_id] ?? 0) + d.amount;
+        }
+      });
+
+      const updatedBudgets = (prev.budgets ?? []).map((b) => {
+        const usedAmount = budgetUsedMap[b.id] ?? 0;
+        const availableAmount = b.allocated_amount - usedAmount;
+        const usagePercentage =
+          b.allocated_amount > 0
+            ? Math.round((usedAmount / b.allocated_amount) * 10000) / 100
+            : 0;
+        return {
+          ...b,
+          used_amount: usedAmount,
+          available_amount: availableAmount,
+          usage_percentage: usagePercentage,
+        };
+      });
+
       return {
         ...prev,
         total_deductions: totalDeductions,
         remaining_amount: remainingAmount,
         committed_ratio: committedRatio,
         deductions: newDeductions,
+        budgets: updatedBudgets,
       };
     });
   };
@@ -359,17 +510,27 @@ export default function FinancialHorizonClient({
                 </h1>
               </div>
               <p className="mt-2 text-sm text-muted-foreground max-w-2xl">
-                Your month&apos;s starting line calculator. Subtracts fixed obligations and next month&apos;s planned purchases from base income to reveal your exact net uncommitted cash pool.
+                Your month&apos;s starting line calculator. Manages monthly budgets, subtracts fixed obligations and planned purchases from base income to reveal your exact net uncommitted cash pool.
               </p>
             </div>
 
-            <button
-              onClick={handleOpenAddDeductionForm}
-              disabled={isPending}
-              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow transition hover:opacity-90 active:scale-95 disabled:opacity-50"
-            >
-              <Plus className="h-4 w-4" /> Add Fixed Obligation
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={handleOpenAddBudgetForm}
+                disabled={isPending}
+                className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition hover:bg-primary/20 active:scale-95 disabled:opacity-50"
+              >
+                <Target className="h-4 w-4" /> Add Monthly Budget
+              </button>
+
+              <button
+                onClick={handleOpenAddDeductionForm}
+                disabled={isPending}
+                className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow transition hover:opacity-90 active:scale-95 disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" /> Add Fixed Obligation
+              </button>
+            </div>
           </div>
         </div>
 
@@ -512,32 +673,240 @@ export default function FinancialHorizonClient({
             </div>
           </div>
 
-          {/* Card 5: Committed Allocation Ratio */}
+          {/* Card 5: Total Allocated / Budgeted */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm transition duration-200 hover:shadow-md">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Total Allocated
+                Total Budgeted
               </span>
-              <PieChart className="h-4 w-4 text-muted-foreground" />
+              <Target className="h-4 w-4 text-primary" />
             </div>
             <div className="mt-2.5">
               <p className="text-xl font-extrabold text-foreground">
-                {totalCommittedRatio.toFixed(1)}%
+                {summary.currency}
+                {(summary.total_budgets_allocated ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
               </p>
-              <div className="mt-2 h-2 w-full rounded-full bg-secondary overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-500 ${
-                    totalCommittedRatio > 80
-                      ? "bg-rose-500"
-                      : totalCommittedRatio > 50
-                      ? "bg-amber-500"
-                      : "bg-emerald-500"
-                  }`}
-                  style={{ width: `${Math.min(100, Math.max(0, totalCommittedRatio))}%` }}
-                />
+              <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                <span>{summary.budgets?.length ?? 0} active budget{(summary.budgets?.length ?? 0) === 1 ? "" : "s"}</span>
+                <span>{totalCommittedRatio.toFixed(1)}% committed</span>
               </div>
             </div>
           </div>
+        </section>
+
+        {/* Add/Edit Budget Modal / Form */}
+        {(isAddingBudget || editingBudgetId !== null) && (
+          <section className="rounded-2xl border border-primary/30 bg-card p-6 shadow-md transition duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-bold text-foreground">
+                  {editingBudgetId !== null ? "Edit Monthly Budget" : "Create Monthly Budget"}
+                </h3>
+              </div>
+              <button
+                onClick={handleCancelBudgetForm}
+                className="rounded-lg p-1 text-muted-foreground hover:bg-secondary"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBudget} className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground">Budget Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Housing & Utilities, Subscriptions, Personal Spending"
+                  value={budgetName}
+                  onChange={(e) => setBudgetName(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground">Monthly Allocated Amount ({summary.currency})</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  placeholder="0.00"
+                  value={budgetAllocated}
+                  onChange={(e) => setBudgetAllocated(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div className="sm:col-span-2 flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleCancelBudgetForm}
+                  className="rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:bg-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 shadow"
+                >
+                  {editingBudgetId !== null ? "Update Budget" : "Save Budget"}
+                </button>
+              </div>
+            </form>
+          </section>
+        )}
+
+        {/* Monthly Budgets Section */}
+        <section className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" />
+                <h2 className="text-xl font-bold text-foreground">Monthly Budgets</h2>
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                  1st – End of Month
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Set monthly spending allocations. Assigning fixed obligations automatically deducts from your available budget balance.
+              </p>
+            </div>
+
+            <button
+              onClick={handleOpenAddBudgetForm}
+              disabled={isPending}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-4 py-2 text-xs font-semibold text-primary transition hover:bg-primary/20"
+            >
+              <Plus className="h-4 w-4" /> Add Budget
+            </button>
+          </div>
+
+          {(summary.budgets ?? []).length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card/50 p-10 text-center">
+              <Target className="mx-auto h-10 w-10 text-muted-foreground opacity-50" />
+              <h3 className="mt-3 text-base font-semibold text-foreground">No monthly budgets configured</h3>
+              <p className="mt-1 text-sm text-muted-foreground max-w-md mx-auto">
+                Create monthly budgets (e.g. Housing, Utilities, SIPs) to track allocations and link your fixed obligations.
+              </p>
+              <button
+                onClick={handleOpenAddBudgetForm}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow hover:opacity-90"
+              >
+                <Plus className="h-4 w-4" /> Add Your First Budget
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {(summary.budgets ?? []).map((b) => {
+                const linkedDeductions = summary.deductions.filter((d) => d.budget_id === b.id);
+                const isOverBudget = b.available_amount < 0;
+                const pct = Math.min(100, Math.max(0, b.usage_percentage));
+
+                return (
+                  <div
+                    key={b.id}
+                    className="group relative rounded-2xl border border-border bg-card p-5 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <Wallet className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-foreground text-base leading-tight">{b.name}</h4>
+                            <span className="text-xs text-muted-foreground">
+                              {linkedDeductions.length} linked obligation{linkedDeductions.length === 1 ? "" : "s"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleOpenEditBudgetForm(b)}
+                            className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition"
+                            title="Edit Budget"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setBudgetToDelete(b)}
+                            className="rounded-lg p-1.5 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 transition"
+                            title="Delete Budget"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Amounts Display */}
+                      <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-secondary/30 p-3">
+                        <div>
+                          <span className="text-[11px] font-semibold text-muted-foreground uppercase">Allocated</span>
+                          <p className="text-sm font-bold text-foreground mt-0.5">
+                            {summary.currency}{b.allocated_amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-[11px] font-semibold text-muted-foreground uppercase">Committed/Used</span>
+                          <p className="text-sm font-bold text-amber-600 dark:text-amber-400 mt-0.5">
+                            {summary.currency}{b.used_amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Usage Progress Bar */}
+                      <div className="mt-4 space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground font-medium">Available Balance</span>
+                          <span
+                            className={`font-bold ${
+                              isOverBudget ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                            }`}
+                          >
+                            {summary.currency}{b.available_amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-500 rounded-full ${
+                              isOverBudget ? "bg-rose-500" : pct > 80 ? "bg-amber-500" : "bg-emerald-500"
+                            }`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-end">
+                          <span className="text-[11px] text-muted-foreground font-semibold">
+                            {b.usage_percentage.toFixed(1)}% committed
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Linked items chips */}
+                    {linkedDeductions.length > 0 && (
+                      <div className="mt-4 border-t border-border/50 pt-3">
+                        <span className="text-[11px] font-semibold text-muted-foreground uppercase">Linked Obligations:</span>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {linkedDeductions.map((item) => (
+                            <span
+                              key={item.id}
+                              className="inline-flex items-center gap-1 rounded-md bg-background border border-border px-2 py-0.5 text-[11px] font-medium text-foreground"
+                            >
+                              {item.name} ({summary.currency}{item.amount})
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         {/* Next Month Purchases Management Section */}
@@ -664,7 +1033,7 @@ export default function FinancialHorizonClient({
               </button>
             </div>
 
-            <form onSubmit={handleSaveDeduction} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <form onSubmit={handleSaveDeduction} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-muted-foreground">Title / Name</label>
                 <input
@@ -719,7 +1088,23 @@ export default function FinancialHorizonClient({
                 />
               </div>
 
-              <div className="sm:col-span-2 lg:col-span-4 flex justify-end gap-3 pt-2">
+              <div className="space-y-1 sm:col-span-2 lg:col-span-2">
+                <label className="text-xs font-semibold text-muted-foreground">Link to Monthly Budget (Optional)</label>
+                <select
+                  value={selectedBudgetId ?? ""}
+                  onChange={(e) => setSelectedBudgetId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">-- No Budget Link --</option>
+                  {(summary.budgets ?? []).map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({summary.currency}{b.allocated_amount.toLocaleString("en-IN")})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="sm:col-span-2 lg:col-span-3 flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={handleCancelDeductionForm}
@@ -799,6 +1184,7 @@ export default function FinancialHorizonClient({
               {filteredDeductions.map((item) => {
                 const catCfg = getCategoryConfig(item.category);
                 const IconComponent = catCfg.icon;
+                const linkedBudget = summary.budgets?.find((b) => b.id === item.budget_id);
 
                 return (
                   <div
@@ -851,6 +1237,13 @@ export default function FinancialHorizonClient({
                         </div>
                       )}
                     </div>
+
+                    {linkedBudget && (
+                      <div className="mt-3 flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20">
+                        <Target className="h-3.5 w-3.5" />
+                        <span>Budget: <strong>{linkedBudget.name}</strong></span>
+                      </div>
+                    )}
 
                     <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/50 pt-3">
                       <button
@@ -920,6 +1313,22 @@ export default function FinancialHorizonClient({
           </div>
         </section>
       </div>
+
+      {/* Confirmation Dialog for Budget Deletion */}
+      <ConfirmationDialog
+        isOpen={!!budgetToDelete}
+        onClose={() => setBudgetToDelete(null)}
+        onConfirm={() => {
+          if (budgetToDelete) handleDeleteBudget(budgetToDelete.id);
+        }}
+        title={budgetToDelete ? `Delete ${budgetToDelete.name}?` : ""}
+        description="This will permanently delete this monthly budget. Any linked obligations will remain intact but become unbudgeted."
+        confirmText="Delete budget"
+        confirmLoadingText="Deleting…"
+        isLoading={deletingBudgetId !== null}
+        error={errorMsg}
+        variant="destructive"
+      />
 
       {/* Confirmation Dialogs for Purchase Deletions */}
       <ConfirmationDialog

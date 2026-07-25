@@ -194,3 +194,84 @@ func TestUpdateAndDeleteDeduction(t *testing.T) {
 		}
 	}
 }
+
+func TestBudgetsAndDeductionLinking(t *testing.T) {
+	db, shutdown := testhelper.StartPostgres(t)
+	defer shutdown()
+
+	h := NewHandler(db)
+	cookie := loginUser(t, db)
+
+	// 1. Create a Budget
+	var budgetID int64
+	{
+		body, _ := json.Marshal(BudgetInput{Name: "Housing & Bills", AllocatedAmount: 50000.0})
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/horizon/budgets", bytes.NewReader(body))
+		req.AddCookie(cookie)
+		h.CreateBudget(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201 Created, got %d", rec.Code)
+		}
+
+		var b BudgetDTO
+		_ = json.NewDecoder(rec.Body).Decode(&b)
+		budgetID = b.ID
+		if b.AllocatedAmount != 50000.0 || b.AvailableAmount != 50000.0 || b.UsedAmount != 0 {
+			t.Errorf("unexpected initial budget DTO: %+v", b)
+		}
+	}
+
+	// 2. Create a deduction linked to the budget
+	{
+		body, _ := json.Marshal(DeductionInput{
+			Name:     "Rent Payment",
+			Category: "housing",
+			Amount:   30000.0,
+			BudgetID: &budgetID,
+		})
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/horizon/deductions", bytes.NewReader(body))
+		req.AddCookie(cookie)
+		h.CreateDeduction(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201 Created, got %d", rec.Code)
+		}
+	}
+
+	// 3. Verify Horizon summary calculates budget used and available amounts correctly
+	{
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/horizon", nil)
+		req.AddCookie(cookie)
+		h.GetHorizon(rec, req)
+
+		var out HorizonSummaryDTO
+		_ = json.NewDecoder(rec.Body).Decode(&out)
+		if len(out.Budgets) != 1 {
+			t.Fatalf("expected 1 budget, got %d", len(out.Budgets))
+		}
+		b := out.Budgets[0]
+		if b.AllocatedAmount != 50000.0 || b.UsedAmount != 30000.0 || b.AvailableAmount != 20000.0 || b.UsagePercentage != 60.0 {
+			t.Errorf("unexpected budget calculations: %+v", b)
+		}
+	}
+
+	// 4. Delete budget and ensure summary does not fail and unlinks budget
+	{
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodDelete, "/api/horizon/budgets/{id}", nil)
+		req.AddCookie(cookie)
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", strconv.FormatInt(budgetID, 10))
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		h.DeleteBudget(rec, req)
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("expected 204 No Content, got %d", rec.Code)
+		}
+	}
+}

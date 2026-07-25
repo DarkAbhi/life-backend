@@ -1,6 +1,15 @@
 import Link from "next/link";
 import { Compass, ArrowRight, Wallet, ShieldAlert, Sparkles } from "lucide-react";
 
+export type BudgetItem = {
+  id: number;
+  name: string;
+  allocated_amount: number;
+  used_amount: number;
+  available_amount: number;
+  usage_percentage: number;
+};
+
 export type DeductionItem = {
   id: number;
   name: string;
@@ -8,6 +17,7 @@ export type DeductionItem = {
   amount: number;
   due_day?: number | null;
   is_active: boolean;
+  budget_id?: number | null;
 };
 
 export type ProjectionItem = {
@@ -22,6 +32,8 @@ export type HorizonSummary = {
   total_deductions: number;
   remaining_amount: number;
   committed_ratio: number;
+  total_budgets_allocated: number;
+  budgets: BudgetItem[];
   deductions: DeductionItem[];
   projections: ProjectionItem[];
 };

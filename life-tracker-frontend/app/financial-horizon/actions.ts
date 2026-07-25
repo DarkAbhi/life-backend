@@ -35,11 +35,90 @@ export async function updateHorizonConfigAction(baseAmount: number, currency: st
   }
 }
 
+export async function addBudgetAction(name: string, allocatedAmount: number) {
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+
+  try {
+    const response = await fetch(`${apiBaseURL}/api/horizon/budgets`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({ name, allocated_amount: allocatedAmount }),
+    });
+
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { ok: false, error: body.error ?? "Failed to create budget." };
+    }
+
+    revalidatePath("/dashboard");
+    revalidatePath("/financial-horizon");
+    return { ok: true, budget: body };
+  } catch {
+    return { ok: false, error: "Unable to reach the server. Please try again." };
+  }
+}
+
+export async function updateBudgetAction(id: number, name: string, allocatedAmount: number) {
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+
+  try {
+    const response = await fetch(`${apiBaseURL}/api/horizon/budgets/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({ name, allocated_amount: allocatedAmount }),
+    });
+
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { ok: false, error: body.error ?? "Failed to update budget." };
+    }
+
+    revalidatePath("/dashboard");
+    revalidatePath("/financial-horizon");
+    return { ok: true, budget: body };
+  } catch {
+    return { ok: false, error: "Unable to reach the server. Please try again." };
+  }
+}
+
+export async function deleteBudgetAction(id: number) {
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+
+  try {
+    const response = await fetch(`${apiBaseURL}/api/horizon/budgets/${id}`, {
+      method: "DELETE",
+      headers: {
+        Cookie: cookieHeader,
+      },
+    });
+
+    if (!response.ok) {
+      return { ok: false, error: "Failed to delete budget." };
+    }
+
+    revalidatePath("/dashboard");
+    revalidatePath("/financial-horizon");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Unable to reach the server. Please try again." };
+  }
+}
+
 export async function addDeductionAction(
   name: string,
   category: string,
   amount: number,
-  dueDay?: number | null
+  dueDay?: number | null,
+  budgetId?: number | null
 ) {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
@@ -56,6 +135,7 @@ export async function addDeductionAction(
         category,
         amount,
         due_day: dueDay ?? null,
+        budget_id: budgetId ?? null,
       }),
     });
 
@@ -78,7 +158,8 @@ export async function updateDeductionAction(
   category: string,
   amount: number,
   dueDay?: number | null,
-  isActive: boolean = true
+  isActive: boolean = true,
+  budgetId?: number | null
 ) {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
@@ -96,6 +177,7 @@ export async function updateDeductionAction(
         amount,
         due_day: dueDay ?? null,
         is_active: isActive,
+        budget_id: budgetId ?? null,
       }),
     });
 

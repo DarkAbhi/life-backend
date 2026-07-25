@@ -65,6 +65,9 @@ func (a *API) Router() http.Handler {
 		// Financial Horizon
 		api.Get("/horizon", horizonHandler.GetHorizon)
 		api.Put("/horizon/config", horizonHandler.UpdateConfig)
+		api.Post("/horizon/budgets", horizonHandler.CreateBudget)
+		api.Put("/horizon/budgets/{id}", horizonHandler.UpdateBudget)
+		api.Delete("/horizon/budgets/{id}", horizonHandler.DeleteBudget)
 		api.Post("/horizon/deductions", horizonHandler.CreateDeduction)
 		api.Put("/horizon/deductions/{id}", horizonHandler.UpdateDeduction)
 		api.Delete("/horizon/deductions/{id}", horizonHandler.DeleteDeduction)
