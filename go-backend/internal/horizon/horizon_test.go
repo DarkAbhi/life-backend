@@ -275,3 +275,146 @@ func TestBudgetsAndDeductionLinking(t *testing.T) {
 		}
 	}
 }
+
+func TestCategoriesAndTransactions(t *testing.T) {
+	db, shutdown := testhelper.StartPostgres(t)
+	defer shutdown()
+
+	h := NewHandler(db)
+	cookie := loginUser(t, db)
+
+	// 1. List Categories (should auto-seed default categories)
+	var defaultCategoryID int64
+	{
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/horizon/categories", nil)
+		req.AddCookie(cookie)
+		h.ListCategories(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", rec.Code)
+		}
+
+		var categories []CategoryDTO
+		if err := json.NewDecoder(rec.Body).Decode(&categories); err != nil {
+			t.Fatalf("failed to decode categories: %v", err)
+		}
+		if len(categories) < 10 {
+			t.Errorf("expected at least 10 default categories, got %d", len(categories))
+		}
+		defaultCategoryID = categories[0].ID
+	}
+
+	// 2. Create Custom Category
+	var customCategoryID int64
+	{
+		icon := "laptop"
+		color := "#10b981"
+		body, _ := json.Marshal(CategoryInput{Name: "Gadgets & Electronics", Icon: &icon, Color: &color})
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/horizon/categories", bytes.NewReader(body))
+		req.AddCookie(cookie)
+		h.CreateCategory(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201 Created, got %d", rec.Code)
+		}
+
+		var c CategoryDTO
+		_ = json.NewDecoder(rec.Body).Decode(&c)
+		if c.Name != "Gadgets & Electronics" || c.IsDefault != false {
+			t.Errorf("unexpected category DTO: %+v", c)
+		}
+		customCategoryID = c.ID
+	}
+
+	// 3. Create Transaction
+	var transactionID int64
+	{
+		notes := "Bought new Wireless Headphones"
+		body, _ := json.Marshal(TransactionInput{
+			Name:       "Sony Headphones",
+			Amount:     15000.0,
+			CategoryID: &customCategoryID,
+			Notes:      &notes,
+		})
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/horizon/transactions", bytes.NewReader(body))
+		req.AddCookie(cookie)
+		h.CreateTransaction(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201 Created, got %d", rec.Code)
+		}
+
+		var tx TransactionDTO
+		_ = json.NewDecoder(rec.Body).Decode(&tx)
+		if tx.Name != "Sony Headphones" || tx.Amount != 15000.0 || tx.CategoryName != "Gadgets & Electronics" {
+			t.Errorf("unexpected transaction DTO: %+v", tx)
+		}
+		transactionID = tx.ID
+	}
+
+	// 4. List Transactions
+	{
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/horizon/transactions", nil)
+		req.AddCookie(cookie)
+		h.ListTransactions(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", rec.Code)
+		}
+
+		var transactions []TransactionDTO
+		_ = json.NewDecoder(rec.Body).Decode(&transactions)
+		if len(transactions) != 1 {
+			t.Errorf("expected 1 transaction, got %d", len(transactions))
+		}
+	}
+
+	// 5. Update Transaction
+	{
+		notes := "Updated price after discount"
+		body, _ := json.Marshal(TransactionInput{
+			Name:       "Sony Headphones Pro",
+			Amount:     13500.0,
+			CategoryID: &defaultCategoryID,
+			Notes:      &notes,
+		})
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPut, "/api/horizon/transactions/{id}", bytes.NewReader(body))
+		req.AddCookie(cookie)
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", strconv.FormatInt(transactionID, 10))
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		h.UpdateTransaction(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", rec.Code)
+		}
+
+		var tx TransactionDTO
+		_ = json.NewDecoder(rec.Body).Decode(&tx)
+		if tx.Amount != 13500.0 || tx.Name != "Sony Headphones Pro" {
+			t.Errorf("unexpected updated transaction: %+v", tx)
+		}
+	}
+
+	// 6. Delete Transaction
+	{
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodDelete, "/api/horizon/transactions/{id}", nil)
+		req.AddCookie(cookie)
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", strconv.FormatInt(transactionID, 10))
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		h.DeleteTransaction(rec, req)
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("expected 204 No Content, got %d", rec.Code)
+		}
+	}
+}

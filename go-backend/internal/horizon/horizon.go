@@ -6,7 +6,9 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/DarkAbhi/life-backend/internal/auth"
 	"github.com/DarkAbhi/life-backend/internal/webutil"
@@ -55,6 +57,44 @@ type DeductionDTO struct {
 	BudgetID *int64  `json:"budget_id"`
 }
 
+type CategoryInput struct {
+	Name  string  `json:"name"`
+	Icon  *string `json:"icon"`
+	Color *string `json:"color"`
+}
+
+type CategoryDTO struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Icon      string `json:"icon"`
+	Color     string `json:"color"`
+	IsDefault bool   `json:"is_default"`
+	UserID    *int64 `json:"user_id,omitempty"`
+}
+
+type TransactionInput struct {
+	Name            string  `json:"name"`
+	Amount          float64 `json:"amount"`
+	TransactionDate *string `json:"transaction_date"`
+	CategoryID      *int64  `json:"category_id"`
+	CategoryName    *string `json:"category_name"`
+	BudgetID        *int64  `json:"budget_id"`
+	Notes           *string `json:"notes"`
+}
+
+type TransactionDTO struct {
+	ID              int64     `json:"id"`
+	Name            string    `json:"name"`
+	Amount          float64   `json:"amount"`
+	TransactionDate time.Time `json:"transaction_date"`
+	CategoryID      *int64    `json:"category_id"`
+	CategoryName    string    `json:"category_name"`
+	BudgetID        *int64    `json:"budget_id"`
+	BudgetName      *string   `json:"budget_name,omitempty"`
+	Notes           *string   `json:"notes,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
 type ProjectionDTO struct {
 	Months                int     `json:"months"`
 	Label                 string  `json:"label"`
@@ -62,15 +102,18 @@ type ProjectionDTO struct {
 }
 
 type HorizonSummaryDTO struct {
-	BaseAmount            float64         `json:"base_amount"`
-	Currency              string          `json:"currency"`
-	TotalDeductions       float64         `json:"total_deductions"`
-	RemainingAmount       float64         `json:"remaining_amount"`
-	CommittedRatio        float64         `json:"committed_ratio"`
-	TotalBudgetsAllocated float64         `json:"total_budgets_allocated"`
-	Budgets               []BudgetDTO     `json:"budgets"`
-	Deductions            []DeductionDTO  `json:"deductions"`
-	Projections           []ProjectionDTO `json:"projections"`
+	BaseAmount            float64          `json:"base_amount"`
+	Currency              string           `json:"currency"`
+	TotalDeductions       float64          `json:"total_deductions"`
+	TotalTransactions     float64          `json:"total_transactions"`
+	RemainingAmount       float64          `json:"remaining_amount"`
+	CommittedRatio        float64          `json:"committed_ratio"`
+	TotalBudgetsAllocated float64          `json:"total_budgets_allocated"`
+	Budgets               []BudgetDTO      `json:"budgets"`
+	Deductions            []DeductionDTO   `json:"deductions"`
+	Categories            []CategoryDTO    `json:"categories"`
+	Transactions          []TransactionDTO `json:"transactions"`
+	Projections           []ProjectionDTO  `json:"projections"`
 }
 
 type Handler struct {
@@ -111,6 +154,8 @@ func (h *Handler) GetHorizon(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) fetchHorizonSummary(userID int64) (*HorizonSummaryDTO, error) {
+	_ = SeedDefaultCategories(h.DB)
+
 	var baseAmount float64
 	var currency string
 
@@ -179,6 +224,25 @@ func (h *Handler) fetchHorizonSummary(userID int64) (*HorizonSummaryDTO, error) 
 		deductions = append(deductions, item)
 	}
 
+	// Fetch Categories
+	categories, err := h.fetchCategories(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch Transactions
+	transactions, totalTransactions, err := h.fetchTransactions(userID, 50)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add transaction usage to budget map
+	for _, t := range transactions {
+		if t.BudgetID != nil {
+			budgetUsedMap[*t.BudgetID] += t.Amount
+		}
+	}
+
 	// Populate budget used, available, and percentage
 	for i := range budgetsList {
 		b := &budgetsList[i]
@@ -206,11 +270,14 @@ func (h *Handler) fetchHorizonSummary(userID int64) (*HorizonSummaryDTO, error) 
 		BaseAmount:            baseAmount,
 		Currency:              currency,
 		TotalDeductions:       totalDeductions,
+		TotalTransactions:     totalTransactions,
 		RemainingAmount:       remainingAmount,
 		CommittedRatio:        committedRatio,
 		TotalBudgetsAllocated: totalBudgetsAllocated,
 		Budgets:               budgetsList,
 		Deductions:            deductions,
+		Categories:            categories,
+		Transactions:          transactions,
 		Projections:           projections,
 	}, nil
 }
@@ -613,4 +680,462 @@ func (h *Handler) DeleteDeduction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) fetchCategories(userID int64) ([]CategoryDTO, error) {
+	rows, err := h.DB.Query(`
+		SELECT id, name, icon, color, is_default, user_id
+		FROM financial_horizon_categories
+		WHERE user_id IS NULL OR user_id = $1
+		ORDER BY is_default DESC, name ASC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	categories := make([]CategoryDTO, 0)
+	for rows.Next() {
+		var c CategoryDTO
+		var uid sql.NullInt64
+		if err := rows.Scan(&c.ID, &c.Name, &c.Icon, &c.Color, &c.IsDefault, &uid); err != nil {
+			return nil, err
+		}
+		if uid.Valid {
+			u := uid.Int64
+			c.UserID = &u
+		}
+		categories = append(categories, c)
+	}
+	return categories, nil
+}
+
+func (h *Handler) fetchTransactions(userID int64, limit int) ([]TransactionDTO, float64, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	query := `
+		SELECT t.id, t.name, t.amount, t.transaction_date, t.category_id, COALESCE(c.name, t.category_name), t.budget_id, b.name, t.notes, t.created_at
+		FROM financial_horizon_transactions t
+		LEFT JOIN financial_horizon_categories c ON t.category_id = c.id
+		LEFT JOIN financial_horizon_budgets b ON t.budget_id = b.id
+		WHERE t.user_id = $1
+		ORDER BY t.transaction_date DESC, t.id DESC
+		LIMIT $2
+	`
+	rows, err := h.DB.Query(query, userID, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	transactions := make([]TransactionDTO, 0)
+	var total float64
+	for rows.Next() {
+		var item TransactionDTO
+		var catID, bID sql.NullInt64
+		var bName, notes sql.NullString
+
+		if err := rows.Scan(&item.ID, &item.Name, &item.Amount, &item.TransactionDate, &catID, &item.CategoryName, &bID, &bName, &notes, &item.CreatedAt); err != nil {
+			return nil, 0, err
+		}
+		if catID.Valid {
+			id := catID.Int64
+			item.CategoryID = &id
+		}
+		if bID.Valid {
+			id := bID.Int64
+			item.BudgetID = &id
+		}
+		if bName.Valid {
+			item.BudgetName = &bName.String
+		}
+		if notes.Valid {
+			item.Notes = &notes.String
+		}
+		total += item.Amount
+		transactions = append(transactions, item)
+	}
+	return transactions, total, nil
+}
+
+func (h *Handler) ListCategories(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetSessionUser(h.DB, r)
+	if errors.Is(err, sql.ErrNoRows) {
+		webutil.Unauthorized(w, "session is invalid or expired")
+		return
+	}
+	if err != nil {
+		webutil.ServerError(w, err)
+		return
+	}
+
+	_ = SeedDefaultCategories(h.DB)
+	categories, err := h.fetchCategories(user.ID)
+	if err != nil {
+		webutil.ServerError(w, err)
+		return
+	}
+
+	webutil.WriteJSON(w, http.StatusOK, categories)
+}
+
+func (h *Handler) CreateCategory(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetSessionUser(h.DB, r)
+	if errors.Is(err, sql.ErrNoRows) {
+		webutil.Unauthorized(w, "session is invalid or expired")
+		return
+	}
+	if err != nil {
+		webutil.ServerError(w, err)
+		return
+	}
+
+	var in CategoryInput
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&in); err != nil {
+		webutil.BadRequest(w, "invalid JSON")
+		return
+	}
+
+	in.Name = strings.TrimSpace(in.Name)
+	if in.Name == "" || len([]rune(in.Name)) > 100 {
+		webutil.BadRequest(w, "category name is required and must be under 100 characters")
+		return
+	}
+
+	icon := "tag"
+	if in.Icon != nil && strings.TrimSpace(*in.Icon) != "" {
+		icon = strings.TrimSpace(*in.Icon)
+	}
+
+	color := "#64748b"
+	if in.Color != nil && strings.TrimSpace(*in.Color) != "" {
+		color = strings.TrimSpace(*in.Color)
+	}
+
+	var c CategoryDTO
+	var userID sql.NullInt64
+	err = h.DB.QueryRow(`
+		INSERT INTO financial_horizon_categories (user_id, name, icon, color, is_default)
+		VALUES ($1, $2, $3, $4, false)
+		RETURNING id, name, icon, color, is_default, user_id
+	`, user.ID, in.Name, icon, color).Scan(&c.ID, &c.Name, &c.Icon, &c.Color, &c.IsDefault, &userID)
+
+	if err != nil {
+		webutil.ServerError(w, err)
+		return
+	}
+
+	if userID.Valid {
+		u := userID.Int64
+		c.UserID = &u
+	}
+
+	webutil.WriteJSON(w, http.StatusCreated, c)
+}
+
+func (h *Handler) ListTransactions(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetSessionUser(h.DB, r)
+	if errors.Is(err, sql.ErrNoRows) {
+		webutil.Unauthorized(w, "session is invalid or expired")
+		return
+	}
+	if err != nil {
+		webutil.ServerError(w, err)
+		return
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	limit := 50
+	if limitStr != "" {
+		if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+
+	transactions, _, err := h.fetchTransactions(user.ID, limit)
+	if err != nil {
+		webutil.ServerError(w, err)
+		return
+	}
+
+	webutil.WriteJSON(w, http.StatusOK, transactions)
+}
+
+func (h *Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetSessionUser(h.DB, r)
+	if errors.Is(err, sql.ErrNoRows) {
+		webutil.Unauthorized(w, "session is invalid or expired")
+		return
+	}
+	if err != nil {
+		webutil.ServerError(w, err)
+		return
+	}
+
+	var in TransactionInput
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&in); err != nil {
+		webutil.BadRequest(w, "invalid JSON")
+		return
+	}
+
+	in.Name = strings.TrimSpace(in.Name)
+	if in.Name == "" || len([]rune(in.Name)) > 255 {
+		webutil.BadRequest(w, "transaction name is required and must be under 255 characters")
+		return
+	}
+
+	if in.Amount <= 0 {
+		webutil.BadRequest(w, "amount must be greater than zero")
+		return
+	}
+
+	txTime := time.Now()
+	if in.TransactionDate != nil && strings.TrimSpace(*in.TransactionDate) != "" {
+		if parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(*in.TransactionDate)); err == nil {
+			txTime = parsed
+		} else if parsed, err := time.Parse("2006-01-02T15:04", strings.TrimSpace(*in.TransactionDate)); err == nil {
+			txTime = parsed
+		} else if parsed, err := time.Parse("2006-01-02", strings.TrimSpace(*in.TransactionDate)); err == nil {
+			txTime = parsed
+		}
+	}
+
+	categoryName := "Other"
+	var categoryID sql.NullInt64
+	if in.CategoryID != nil && *in.CategoryID > 0 {
+		categoryID = sql.NullInt64{Int64: *in.CategoryID, Valid: true}
+		var cName string
+		err := h.DB.QueryRow(`SELECT name FROM financial_horizon_categories WHERE id = $1 AND (user_id IS NULL OR user_id = $2)`, *in.CategoryID, user.ID).Scan(&cName)
+		if err == nil {
+			categoryName = cName
+		}
+	} else if in.CategoryName != nil && strings.TrimSpace(*in.CategoryName) != "" {
+		categoryName = strings.TrimSpace(*in.CategoryName)
+	}
+
+	var budgetID sql.NullInt64
+	if in.BudgetID != nil && *in.BudgetID > 0 {
+		budgetID = sql.NullInt64{Int64: *in.BudgetID, Valid: true}
+	}
+
+	var notes sql.NullString
+	if in.Notes != nil && strings.TrimSpace(*in.Notes) != "" {
+		notes = sql.NullString{String: strings.TrimSpace(*in.Notes), Valid: true}
+	}
+
+	var item TransactionDTO
+	var catID, bID sql.NullInt64
+	var bName, notesVal sql.NullString
+
+	err = h.DB.QueryRow(`
+		INSERT INTO financial_horizon_transactions (user_id, name, amount, transaction_date, category_id, category_name, budget_id, notes)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id, name, amount, transaction_date, category_id, category_name, budget_id, notes, created_at
+	`, user.ID, in.Name, in.Amount, txTime, categoryID, categoryName, budgetID, notes).Scan(
+		&item.ID, &item.Name, &item.Amount, &item.TransactionDate, &catID, &item.CategoryName, &bID, &notesVal, &item.CreatedAt,
+	)
+
+	if err != nil {
+		webutil.ServerError(w, err)
+		return
+	}
+
+	if catID.Valid {
+		id := catID.Int64
+		item.CategoryID = &id
+	}
+	if bID.Valid {
+		id := bID.Int64
+		item.BudgetID = &id
+		_ = h.DB.QueryRow(`SELECT name FROM financial_horizon_budgets WHERE id = $1 AND user_id = $2`, id, user.ID).Scan(&bName)
+		if bName.Valid {
+			item.BudgetName = &bName.String
+		}
+	}
+	if notesVal.Valid {
+		item.Notes = &notesVal.String
+	}
+
+	webutil.WriteJSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetSessionUser(h.DB, r)
+	if errors.Is(err, sql.ErrNoRows) {
+		webutil.Unauthorized(w, "session is invalid or expired")
+		return
+	}
+	if err != nil {
+		webutil.ServerError(w, err)
+		return
+	}
+
+	txID, ok := webutil.ParseID(w, r)
+	if !ok {
+		return
+	}
+
+	var in TransactionInput
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&in); err != nil {
+		webutil.BadRequest(w, "invalid JSON")
+		return
+	}
+
+	in.Name = strings.TrimSpace(in.Name)
+	if in.Name == "" || len([]rune(in.Name)) > 255 {
+		webutil.BadRequest(w, "transaction name is required and must be under 255 characters")
+		return
+	}
+
+	if in.Amount <= 0 {
+		webutil.BadRequest(w, "amount must be greater than zero")
+		return
+	}
+
+	txTime := time.Now()
+	if in.TransactionDate != nil && strings.TrimSpace(*in.TransactionDate) != "" {
+		if parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(*in.TransactionDate)); err == nil {
+			txTime = parsed
+		} else if parsed, err := time.Parse("2006-01-02T15:04", strings.TrimSpace(*in.TransactionDate)); err == nil {
+			txTime = parsed
+		} else if parsed, err := time.Parse("2006-01-02", strings.TrimSpace(*in.TransactionDate)); err == nil {
+			txTime = parsed
+		}
+	}
+
+	categoryName := "Other"
+	var categoryID sql.NullInt64
+	if in.CategoryID != nil && *in.CategoryID > 0 {
+		categoryID = sql.NullInt64{Int64: *in.CategoryID, Valid: true}
+		var cName string
+		err := h.DB.QueryRow(`SELECT name FROM financial_horizon_categories WHERE id = $1 AND (user_id IS NULL OR user_id = $2)`, *in.CategoryID, user.ID).Scan(&cName)
+		if err == nil {
+			categoryName = cName
+		}
+	} else if in.CategoryName != nil && strings.TrimSpace(*in.CategoryName) != "" {
+		categoryName = strings.TrimSpace(*in.CategoryName)
+	}
+
+	var budgetID sql.NullInt64
+	if in.BudgetID != nil && *in.BudgetID > 0 {
+		budgetID = sql.NullInt64{Int64: *in.BudgetID, Valid: true}
+	}
+
+	var notes sql.NullString
+	if in.Notes != nil && strings.TrimSpace(*in.Notes) != "" {
+		notes = sql.NullString{String: strings.TrimSpace(*in.Notes), Valid: true}
+	}
+
+	var item TransactionDTO
+	var catID, bID sql.NullInt64
+	var bName, notesVal sql.NullString
+
+	err = h.DB.QueryRow(`
+		UPDATE financial_horizon_transactions
+		SET name = $1, amount = $2, transaction_date = $3, category_id = $4, category_name = $5, budget_id = $6, notes = $7, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $8 AND user_id = $9
+		RETURNING id, name, amount, transaction_date, category_id, category_name, budget_id, notes, created_at
+	`, in.Name, in.Amount, txTime, categoryID, categoryName, budgetID, notes, txID, user.ID).Scan(
+		&item.ID, &item.Name, &item.Amount, &item.TransactionDate, &catID, &item.CategoryName, &bID, &notesVal, &item.CreatedAt,
+	)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		webutil.ServerError(w, err)
+		return
+	}
+
+	if catID.Valid {
+		id := catID.Int64
+		item.CategoryID = &id
+	}
+	if bID.Valid {
+		id := bID.Int64
+		item.BudgetID = &id
+		_ = h.DB.QueryRow(`SELECT name FROM financial_horizon_budgets WHERE id = $1 AND user_id = $2`, id, user.ID).Scan(&bName)
+		if bName.Valid {
+			item.BudgetName = &bName.String
+		}
+	}
+	if notesVal.Valid {
+		item.Notes = &notesVal.String
+	}
+
+	webutil.WriteJSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) DeleteTransaction(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetSessionUser(h.DB, r)
+	if errors.Is(err, sql.ErrNoRows) {
+		webutil.Unauthorized(w, "session is invalid or expired")
+		return
+	}
+	if err != nil {
+		webutil.ServerError(w, err)
+		return
+	}
+
+	txID, ok := webutil.ParseID(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := h.DB.Exec(`DELETE FROM financial_horizon_transactions WHERE id = $1 AND user_id = $2`, txID, user.ID)
+	if err != nil {
+		webutil.ServerError(w, err)
+		return
+	}
+
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		webutil.ServerError(w, err)
+		return
+	}
+	if deleted == 0 {
+		http.NotFound(w, r)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func SeedDefaultCategories(db *sql.DB) error {
+	var count int
+	err := db.QueryRow(`SELECT COUNT(*) FROM financial_horizon_categories WHERE is_default = true`).Scan(&count)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+
+	defaultCategories := []struct {
+		name  string
+		icon  string
+		color string
+	}{
+		{"Food & Dining", "utensils", "#f97316"},
+		{"Bills & Utilities", "receipt", "#ef4444"},
+		{"Housing", "home", "#8b5cf6"},
+		{"Transportation", "car", "#3b82f6"},
+		{"Shopping", "shopping-bag", "#ec4899"},
+		{"Entertainment", "film", "#14b8a6"},
+		{"Health & Fitness", "heart-pulse", "#06b6d4"},
+		{"Investments & Savings", "trending-up", "#22c55e"},
+		{"Subscriptions", "credit-card", "#6366f1"},
+		{"Other", "tag", "#64748b"},
+	}
+
+	for _, c := range defaultCategories {
+		_, _ = db.Exec(`
+			INSERT INTO financial_horizon_categories (name, icon, color, is_default)
+			VALUES ($1, $2, $3, true)
+			ON CONFLICT DO NOTHING
+		`, c.name, c.icon, c.color)
+	}
+	return nil
 }

@@ -297,3 +297,157 @@ export async function clearAllNextMonthPurchasesAction() {
     return { ok: false, error: "We couldn't reach the server. Please try again." };
   }
 }
+
+// Category Actions
+export async function getHorizonCategoriesAction() {
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+
+  try {
+    const response = await fetch(`${apiBaseURL}/api/horizon/categories`, {
+      headers: { Cookie: cookieHeader },
+      cache: "no-store",
+    });
+    const body = await response.json().catch(() => ([]));
+    if (!response.ok) {
+      return { ok: false, error: "Failed to fetch categories." };
+    }
+    return { ok: true, categories: body };
+  } catch {
+    return { ok: false, error: "Unable to reach the server." };
+  }
+}
+
+export async function addHorizonCategoryAction(name: string, icon?: string, color?: string) {
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+
+  try {
+    const response = await fetch(`${apiBaseURL}/api/horizon/categories`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({ name, icon, color }),
+    });
+
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { ok: false, error: body.error ?? "Failed to create category." };
+    }
+
+    revalidatePath("/dashboard");
+    revalidatePath("/financial-horizon");
+    return { ok: true, category: body };
+  } catch {
+    return { ok: false, error: "Unable to reach the server." };
+  }
+}
+
+// Transaction Actions
+export async function addTransactionAction(
+  name: string,
+  amount: number,
+  transactionDate?: string | null,
+  categoryId?: number | null,
+  budgetId?: number | null,
+  notes?: string | null
+) {
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+
+  try {
+    const response = await fetch(`${apiBaseURL}/api/horizon/transactions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        name,
+        amount,
+        transaction_date: transactionDate ?? null,
+        category_id: categoryId ?? null,
+        budget_id: budgetId ?? null,
+        notes: notes ?? null,
+      }),
+    });
+
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { ok: false, error: body.error ?? "Failed to add transaction." };
+    }
+
+    revalidatePath("/dashboard");
+    revalidatePath("/financial-horizon");
+    return { ok: true, transaction: body };
+  } catch {
+    return { ok: false, error: "Unable to reach the server. Please try again." };
+  }
+}
+
+export async function updateTransactionAction(
+  id: number,
+  name: string,
+  amount: number,
+  transactionDate?: string | null,
+  categoryId?: number | null,
+  budgetId?: number | null,
+  notes?: string | null
+) {
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+
+  try {
+    const response = await fetch(`${apiBaseURL}/api/horizon/transactions/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        name,
+        amount,
+        transaction_date: transactionDate ?? null,
+        category_id: categoryId ?? null,
+        budget_id: budgetId ?? null,
+        notes: notes ?? null,
+      }),
+    });
+
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { ok: false, error: body.error ?? "Failed to update transaction." };
+    }
+
+    revalidatePath("/dashboard");
+    revalidatePath("/financial-horizon");
+    return { ok: true, transaction: body };
+  } catch {
+    return { ok: false, error: "Unable to reach the server. Please try again." };
+  }
+}
+
+export async function deleteTransactionAction(id: number) {
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+
+  try {
+    const response = await fetch(`${apiBaseURL}/api/horizon/transactions/${id}`, {
+      method: "DELETE",
+      headers: { Cookie: cookieHeader },
+    });
+
+    if (!response.ok) {
+      return { ok: false, error: "Failed to delete transaction." };
+    }
+
+    revalidatePath("/dashboard");
+    revalidatePath("/financial-horizon");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Unable to reach the server. Please try again." };
+  }
+}
+

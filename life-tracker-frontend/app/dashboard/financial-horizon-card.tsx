@@ -26,15 +26,40 @@ export type ProjectionItem = {
   cumulative_uncommitted: number;
 };
 
+export type CategoryItem = {
+  id: number;
+  name: string;
+  icon: string;
+  color: string;
+  is_default: boolean;
+  user_id?: number | null;
+};
+
+export type TransactionItem = {
+  id: number;
+  name: string;
+  amount: number;
+  transaction_date: string;
+  category_id?: number | null;
+  category_name: string;
+  budget_id?: number | null;
+  budget_name?: string | null;
+  notes?: string | null;
+  created_at: string;
+};
+
 export type HorizonSummary = {
   base_amount: number;
   currency: string;
   total_deductions: number;
+  total_transactions?: number;
   remaining_amount: number;
   committed_ratio: number;
   total_budgets_allocated: number;
   budgets: BudgetItem[];
   deductions: DeductionItem[];
+  categories?: CategoryItem[];
+  transactions?: TransactionItem[];
   projections: ProjectionItem[];
 };
 
