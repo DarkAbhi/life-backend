@@ -30,6 +30,8 @@ import {
   Filter,
 } from "lucide-react";
 import ConfirmationDialog from "../components/design-system/confirmation-dialog";
+import TransactionDialog from "./transaction-dialog";
+import CategoryDialog from "./category-dialog";
 import { HorizonSummary, DeductionItem, BudgetItem, CategoryItem, TransactionItem } from "../dashboard/financial-horizon-card";
 import {
   updateHorizonConfigAction,
@@ -120,21 +122,11 @@ export default function FinancialHorizonClient({
   const [categories, setCategories] = useState<CategoryItem[]>(initialSummary.categories ?? []);
   const [txCategoryFilter, setTxCategoryFilter] = useState<string>("all");
 
-  // Transaction Form State
-  const [isAddingTransaction, setIsAddingTransaction] = useState(false);
-  const [editingTxId, setEditingTxId] = useState<number | null>(null);
-  const [txName, setTxName] = useState("");
-  const [txAmount, setTxAmount] = useState("");
-  const [txDate, setTxDate] = useState("");
-  const [txCategoryId, setTxCategoryId] = useState<number | null>(null);
-  const [txBudgetId, setTxBudgetId] = useState<number | null>(null);
-  const [txNotes, setTxNotes] = useState("");
+  // Transaction & Category Dialog State
+  const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<TransactionItem | null>(null);
   const [txToDelete, setTxToDelete] = useState<TransactionItem | null>(null);
-
-  // Custom Category Form State
-  const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [catName, setCatName] = useState("");
-  const [catColor, setCatColor] = useState("#3b82f6");
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
 
   const [errorMsg, setErrorMsg] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -512,62 +504,55 @@ export default function FinancialHorizonClient({
 
   // Transaction & Category Handlers
   const handleOpenAddTransaction = () => {
-    setEditingTxId(null);
-    setTxName("");
-    setTxAmount("");
-    const now = new Date();
-    const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-    setTxDate(localIso);
-    setTxCategoryId(categories.length > 0 ? categories[0].id : null);
-    setTxBudgetId(null);
-    setTxNotes("");
-    setErrorMsg("");
-    setIsAddingTransaction(true);
+    setEditingTransaction(null);
+    setIsTransactionDialogOpen(true);
   };
 
   const handleOpenEditTransaction = (tx: TransactionItem) => {
-    setEditingTxId(tx.id);
-    setTxName(tx.name);
-    setTxAmount(tx.amount.toString());
-    const d = tx.transaction_date ? new Date(tx.transaction_date) : new Date();
-    const localIso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-    setTxDate(localIso);
-    setTxCategoryId(tx.category_id ?? null);
-    setTxBudgetId(tx.budget_id ?? null);
-    setTxNotes(tx.notes ?? "");
-    setErrorMsg("");
-    setIsAddingTransaction(true);
+    setEditingTransaction(tx);
+    setIsTransactionDialogOpen(true);
   };
 
-  const handleSaveTransaction = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveTransaction = async (data: {
+    id?: number;
+    name: string;
+    amount: number;
+    transactionDate: string;
+    categoryId?: number | null;
+    budgetId?: number | null;
+    notes?: string | null;
+  }) => {
     setErrorMsg("");
-    const parsedAmount = parseFloat(txAmount);
-    if (!txName.trim()) {
-      setErrorMsg("Transaction name is required.");
-      return;
-    }
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      setErrorMsg("Please enter a valid positive amount.");
-      return;
-    }
-
     startTransition(async () => {
-      const isoDate = txDate ? new Date(txDate).toISOString() : new Date().toISOString();
-      if (editingTxId !== null) {
-        const res = await updateTransactionAction(editingTxId, txName.trim(), parsedAmount, isoDate, txCategoryId, txBudgetId, txNotes.trim() || null);
+      if (data.id) {
+        const res = await updateTransactionAction(
+          data.id,
+          data.name,
+          data.amount,
+          data.transactionDate,
+          data.categoryId,
+          data.budgetId,
+          data.notes
+        );
         if (res.ok && res.transaction) {
-          setTransactions((prev) => prev.map((t) => (t.id === editingTxId ? res.transaction : t)));
-          setIsAddingTransaction(false);
-          setEditingTxId(null);
+          setTransactions((prev) => prev.map((t) => (t.id === data.id ? res.transaction : t)));
+          setIsTransactionDialogOpen(false);
+          setEditingTransaction(null);
         } else {
           setErrorMsg(res.error ?? "Failed to update transaction.");
         }
       } else {
-        const res = await addTransactionAction(txName.trim(), parsedAmount, isoDate, txCategoryId, txBudgetId, txNotes.trim() || null);
+        const res = await addTransactionAction(
+          data.name,
+          data.amount,
+          data.transactionDate,
+          data.categoryId,
+          data.budgetId,
+          data.notes
+        );
         if (res.ok && res.transaction) {
           setTransactions((prev) => [res.transaction, ...prev]);
-          setIsAddingTransaction(false);
+          setIsTransactionDialogOpen(false);
         } else {
           setErrorMsg(res.error ?? "Failed to add transaction.");
         }
@@ -589,20 +574,13 @@ export default function FinancialHorizonClient({
     });
   };
 
-  const handleSaveCategory = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveCategory = async (data: { name: string; color: string }) => {
     setErrorMsg("");
-    if (!catName.trim()) {
-      setErrorMsg("Category name is required.");
-      return;
-    }
-
     startTransition(async () => {
-      const res = await addHorizonCategoryAction(catName.trim(), "tag", catColor);
+      const res = await addHorizonCategoryAction(data.name, "tag", data.color);
       if (res.ok && res.category) {
         setCategories((prev) => [...prev, res.category]);
-        setIsAddingCategory(false);
-        setCatName("");
+        setIsCategoryDialogOpen(false);
       } else {
         setErrorMsg(res.error ?? "Failed to add category.");
       }
@@ -1163,7 +1141,7 @@ export default function FinancialHorizonClient({
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setIsAddingCategory(true)}
+                onClick={() => setIsCategoryDialogOpen(true)}
                 disabled={isPending}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-2 text-xs font-semibold text-foreground transition hover:bg-secondary"
               >
@@ -1318,185 +1296,7 @@ export default function FinancialHorizonClient({
           )}
         </section>
 
-        {/* Add/Edit Transaction Modal / Form */}
-        {(isAddingTransaction || editingTxId !== null) && (
-          <section className="rounded-2xl border border-primary/30 bg-card p-6 shadow-md transition duration-200">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-foreground">
-                {editingTxId !== null ? "Edit Transaction" : "Log New Transaction"}
-              </h3>
-              <button
-                onClick={() => {
-                  setIsAddingTransaction(false);
-                  setEditingTxId(null);
-                }}
-                className="rounded-lg p-1 text-muted-foreground hover:bg-secondary"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
 
-            <form onSubmit={handleSaveTransaction} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-1 sm:col-span-2">
-                <label className="text-xs font-semibold text-muted-foreground">Transaction Name / Description</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Weekly Grocery Shopping, Coffee, Gasoline"
-                  value={txName}
-                  onChange={(e) => setTxName(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Amount ({summary.currency})</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  required
-                  placeholder="0.00"
-                  value={txAmount}
-                  onChange={(e) => setTxAmount(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Date & Time</label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={txDate}
-                  onChange={(e) => setTxDate(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Category</label>
-                <select
-                  value={txCategoryId ?? ""}
-                  onChange={(e) => setTxCategoryId(e.target.value ? parseInt(e.target.value, 10) : null)}
-                  className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Link to Budget (Optional)</label>
-                <select
-                  value={txBudgetId ?? ""}
-                  onChange={(e) => setTxBudgetId(e.target.value ? parseInt(e.target.value, 10) : null)}
-                  className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="">-- Unlinked --</option>
-                  {(summary.budgets ?? []).map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name} ({summary.currency}{b.allocated_amount.toLocaleString()})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1 sm:col-span-2 lg:col-span-3">
-                <label className="text-xs font-semibold text-muted-foreground">Notes / Remarks (Optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Paid via UPI, invoice #1234"
-                  value={txNotes}
-                  onChange={(e) => setTxNotes(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              <div className="sm:col-span-2 lg:col-span-3 flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAddingTransaction(false);
-                    setEditingTxId(null);
-                  }}
-                  className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 shadow"
-                >
-                  {editingTxId !== null ? "Update Transaction" : "Save Transaction"}
-                </button>
-              </div>
-            </form>
-          </section>
-        )}
-
-        {/* Add Custom Category Modal */}
-        {isAddingCategory && (
-          <section className="rounded-2xl border border-primary/30 bg-card p-6 shadow-md transition duration-200">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-foreground">Add Custom Category</h3>
-              <button
-                onClick={() => setIsAddingCategory(false)}
-                className="rounded-lg p-1 text-muted-foreground hover:bg-secondary"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveCategory} className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Category Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Pet Care, Education, Gaming"
-                  value={catName}
-                  onChange={(e) => setCatName(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Badge Color</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={catColor}
-                    onChange={(e) => setCatColor(e.target.value)}
-                    className="h-10 w-16 cursor-pointer rounded-lg border border-border bg-background p-1"
-                  />
-                  <span className="text-sm font-mono text-muted-foreground">{catColor}</span>
-                </div>
-              </div>
-
-              <div className="sm:col-span-2 flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddingCategory(false)}
-                  className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 shadow"
-                >
-                  Save Category
-                </button>
-              </div>
-            </form>
-          </section>
-        )}
 
         {/* Add/Edit Deduction Modal / Form */}
         {(isAddingDeduction || editingDeductionId !== null) && (
@@ -1851,6 +1651,29 @@ export default function FinancialHorizonClient({
         isLoading={isPending}
         error={errorMsg}
         variant="destructive"
+      />
+
+      {/* Transaction Entry Dialog */}
+      <TransactionDialog
+        isOpen={isTransactionDialogOpen}
+        onClose={() => {
+          setIsTransactionDialogOpen(false);
+          setEditingTransaction(null);
+        }}
+        onSave={handleSaveTransaction}
+        editingTransaction={editingTransaction}
+        categories={categories}
+        budgets={summary.budgets ?? []}
+        currency={summary.currency}
+        isPending={isPending}
+      />
+
+      {/* Category Entry Dialog */}
+      <CategoryDialog
+        isOpen={isCategoryDialogOpen}
+        onClose={() => setIsCategoryDialogOpen(false)}
+        onSave={handleSaveCategory}
+        isPending={isPending}
       />
     </main>
   );

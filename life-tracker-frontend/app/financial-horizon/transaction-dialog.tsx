@@ -1,0 +1,262 @@
+"use client";
+
+import { useState, useEffect, useId } from "react";
+import { X, Receipt, Wallet } from "lucide-react";
+import { TransactionItem, CategoryItem, BudgetItem } from "../dashboard/financial-horizon-card";
+
+export interface TransactionDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (data: {
+    id?: number;
+    name: string;
+    amount: number;
+    transactionDate: string;
+    categoryId?: number | null;
+    budgetId?: number | null;
+    notes?: string | null;
+  }) => Promise<void> | void;
+  editingTransaction?: TransactionItem | null;
+  categories: CategoryItem[];
+  budgets: BudgetItem[];
+  currency: string;
+  isPending?: boolean;
+}
+
+export default function TransactionDialog({
+  isOpen,
+  onClose,
+  onSave,
+  editingTransaction,
+  categories,
+  budgets,
+  currency,
+  isPending = false,
+}: TransactionDialogProps) {
+  const titleId = useId();
+
+  const [txName, setTxName] = useState("");
+  const [txAmount, setTxAmount] = useState("");
+  const [txDate, setTxDate] = useState("");
+  const [txCategoryId, setTxCategoryId] = useState<number | null>(null);
+  const [txBudgetId, setTxBudgetId] = useState<number | null>(null);
+  const [txNotes, setTxNotes] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  // Synchronize state when modal opens or editingTransaction changes
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setErrorMsg("");
+    if (editingTransaction) {
+      setTxName(editingTransaction.name);
+      setTxAmount(editingTransaction.amount.toString());
+      const d = editingTransaction.transaction_date ? new Date(editingTransaction.transaction_date) : new Date();
+      const localIso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      setTxDate(localIso);
+      setTxCategoryId(editingTransaction.category_id ?? null);
+      setTxBudgetId(editingTransaction.budget_id ?? null);
+      setTxNotes(editingTransaction.notes ?? "");
+    } else {
+      setTxName("");
+      setTxAmount("");
+      const now = new Date();
+      const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      setTxDate(localIso);
+      setTxCategoryId(categories.length > 0 ? categories[0].id : null);
+      setTxBudgetId(null);
+      setTxNotes("");
+    }
+  }, [isOpen, editingTransaction, categories]);
+
+  // Escape key listener to close modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isPending) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose, isPending]);
+
+  if (!isOpen) return null;
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget && !isPending) {
+      onClose();
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+
+    const parsedAmount = parseFloat(txAmount);
+    if (!txName.trim()) {
+      setErrorMsg("Transaction name is required.");
+      return;
+    }
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      setErrorMsg("Please enter a valid positive amount.");
+      return;
+    }
+
+    const isoDate = txDate ? new Date(txDate).toISOString() : new Date().toISOString();
+
+    try {
+      await onSave({
+        id: editingTransaction?.id,
+        name: txName.trim(),
+        amount: parsedAmount,
+        transactionDate: isoDate,
+        categoryId: txCategoryId,
+        budgetId: txBudgetId,
+        notes: txNotes.trim() || null,
+      });
+    } catch {
+      setErrorMsg("Failed to save transaction.");
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-xs transition-opacity duration-200"
+      onClick={handleBackdropClick}
+      role="dialog"
+      aria-labelledby={titleId}
+      aria-modal="true"
+    >
+      <div className="w-full max-w-xl scale-100 transform rounded-2xl border border-border bg-card p-6 shadow-2xl transition-all duration-200">
+        <div className="flex items-center justify-between border-b border-border pb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Receipt className="h-5 w-5" />
+            </div>
+            <h2 className="text-xl font-bold text-foreground" id={titleId}>
+              {editingTransaction ? "Edit Transaction" : "Log New Transaction"}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={isPending}
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition disabled:opacity-50"
+            title="Close dialog"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+          {errorMsg && (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs font-semibold text-destructive">
+              {errorMsg}
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-muted-foreground">Transaction Title / Description</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Weekly Grocery Shopping, Coffee, Gasoline"
+              value={txName}
+              onChange={(e) => setTxName(e.target.value)}
+              className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Amount ({currency})</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                required
+                placeholder="0.00"
+                value={txAmount}
+                onChange={(e) => setTxAmount(e.target.value)}
+                className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Date & Time</label>
+              <input
+                type="datetime-local"
+                required
+                value={txDate}
+                onChange={(e) => setTxDate(e.target.value)}
+                className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Category</label>
+              <select
+                value={txCategoryId ?? ""}
+                onChange={(e) => setTxCategoryId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Link to Budget (Optional)</label>
+              <select
+                value={txBudgetId ?? ""}
+                onChange={(e) => setTxBudgetId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">-- Unlinked --</option>
+                {budgets.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({currency}{b.allocated_amount.toLocaleString()})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-muted-foreground">Notes / Remarks (Optional)</label>
+            <input
+              type="text"
+              placeholder="e.g. Paid via UPI, invoice #1234"
+              value={txNotes}
+              onChange={(e) => setTxNotes(e.target.value)}
+              className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-border mt-6">
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={onClose}
+              className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-secondary transition disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isPending}
+              className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow hover:opacity-90 transition active:scale-95 disabled:opacity-50"
+            >
+              {isPending ? "Saving…" : editingTransaction ? "Update Transaction" : "Save Transaction"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
