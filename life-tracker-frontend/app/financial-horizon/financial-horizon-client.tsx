@@ -204,6 +204,77 @@ export default function FinancialHorizonClient({
     setErrorMsg("");
   };
 
+  const recalculateSummary = ({
+    deductionsUpdater,
+    transactionsUpdater,
+    budgetsUpdater,
+  }: {
+    deductionsUpdater?: (prev: DeductionItem[]) => DeductionItem[];
+    transactionsUpdater?: (prev: TransactionItem[]) => TransactionItem[];
+    budgetsUpdater?: (prev: BudgetItem[]) => BudgetItem[];
+  } = {}) => {
+    let nextTx = transactions;
+    if (transactionsUpdater) {
+      nextTx = transactionsUpdater(transactions);
+      setTransactions(nextTx);
+    }
+
+    setSummary((prev) => {
+      const newDeductions = deductionsUpdater ? deductionsUpdater(prev.deductions) : prev.deductions;
+      const newBudgetsList = budgetsUpdater ? budgetsUpdater(prev.budgets ?? []) : (prev.budgets ?? []);
+
+      const totalDeductions = newDeductions
+        .filter((d) => d.is_active)
+        .reduce((sum, d) => sum + d.amount, 0);
+
+      const totalBudgetsAllocated = newBudgetsList.reduce((sum, b) => sum + b.allocated_amount, 0);
+      const remainingAmount = prev.base_amount - totalDeductions;
+      const committedRatio =
+        prev.base_amount > 0
+          ? Math.round((totalDeductions / prev.base_amount) * 10000) / 100
+          : 0;
+
+      // Recalculate budget used amounts from active deductions AND transactions
+      const budgetUsedMap: Record<number, number> = {};
+      newDeductions.forEach((d) => {
+        if (d.is_active && d.budget_id) {
+          budgetUsedMap[d.budget_id] = (budgetUsedMap[d.budget_id] ?? 0) + d.amount;
+        }
+      });
+
+      nextTx.forEach((t) => {
+        if (t.budget_id) {
+          budgetUsedMap[t.budget_id] = (budgetUsedMap[t.budget_id] ?? 0) + t.amount;
+        }
+      });
+
+      const updatedBudgets = newBudgetsList.map((b) => {
+        const usedAmount = budgetUsedMap[b.id] ?? 0;
+        const availableAmount = b.allocated_amount - usedAmount;
+        const usagePercentage =
+          b.allocated_amount > 0
+            ? Math.round((usedAmount / b.allocated_amount) * 10000) / 100
+            : 0;
+        return {
+          ...b,
+          used_amount: usedAmount,
+          available_amount: availableAmount,
+          usage_percentage: usagePercentage,
+        };
+      });
+
+      return {
+        ...prev,
+        total_deductions: totalDeductions,
+        total_budgets_allocated: totalBudgetsAllocated,
+        remaining_amount: remainingAmount,
+        committed_ratio: committedRatio,
+        deductions: newDeductions,
+        budgets: updatedBudgets,
+      };
+    });
+  };
+
   const handleSaveBudget = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
@@ -221,12 +292,9 @@ export default function FinancialHorizonClient({
       if (editingBudgetId !== null) {
         const res = await updateBudgetAction(editingBudgetId, budgetName, parsedAllocated);
         if (res.ok && res.budget) {
-          setSummary((prev) => {
-            const updatedBudgets = (prev.budgets ?? []).map((b) =>
-              b.id === editingBudgetId ? res.budget : b
-            );
-            const totalAllocated = updatedBudgets.reduce((sum, b) => sum + b.allocated_amount, 0);
-            return { ...prev, budgets: updatedBudgets, total_budgets_allocated: totalAllocated };
+          recalculateSummary({
+            budgetsUpdater: (prev) =>
+              prev.map((b) => (b.id === editingBudgetId ? res.budget : b)),
           });
           setEditingBudgetId(null);
         } else {
@@ -235,10 +303,8 @@ export default function FinancialHorizonClient({
       } else {
         const res = await addBudgetAction(budgetName, parsedAllocated);
         if (res.ok && res.budget) {
-          setSummary((prev) => {
-            const updatedBudgets = [...(prev.budgets ?? []), res.budget];
-            const totalAllocated = updatedBudgets.reduce((sum, b) => sum + b.allocated_amount, 0);
-            return { ...prev, budgets: updatedBudgets, total_budgets_allocated: totalAllocated };
+          recalculateSummary({
+            budgetsUpdater: (prev) => [...prev, res.budget],
           });
           setIsAddingBudget(false);
         } else {
@@ -254,18 +320,12 @@ export default function FinancialHorizonClient({
     startTransition(async () => {
       const res = await deleteBudgetAction(id);
       if (res.ok) {
-        setSummary((prev) => {
-          const updatedBudgets = (prev.budgets ?? []).filter((b) => b.id !== id);
-          const updatedDeductions = prev.deductions.map((d) =>
-            d.budget_id === id ? { ...d, budget_id: null } : d
-          );
-          const totalAllocated = updatedBudgets.reduce((sum, b) => sum + b.allocated_amount, 0);
-          return {
-            ...prev,
-            budgets: updatedBudgets,
-            deductions: updatedDeductions,
-            total_budgets_allocated: totalAllocated,
-          };
+        recalculateSummary({
+          budgetsUpdater: (prev) => prev.filter((b) => b.id !== id),
+          deductionsUpdater: (prev) =>
+            prev.map((d) => (d.budget_id === id ? { ...d, budget_id: null } : d)),
+          transactionsUpdater: (prev) =>
+            prev.map((t) => (t.budget_id === id ? { ...t, budget_id: null, budget_name: null } : t)),
         });
         setBudgetToDelete(null);
       } else {
@@ -337,9 +397,10 @@ export default function FinancialHorizonClient({
           selectedBudgetId
         );
         if (res.ok && res.deduction) {
-          recalculateSummary((prev) =>
-            prev.map((d) => (d.id === editingDeductionId ? res.deduction : d))
-          );
+          recalculateSummary({
+            deductionsUpdater: (prev) =>
+              prev.map((d) => (d.id === editingDeductionId ? res.deduction : d)),
+          });
           setEditingDeductionId(null);
           setSelectedBudgetId(null);
         } else {
@@ -354,7 +415,9 @@ export default function FinancialHorizonClient({
           selectedBudgetId
         );
         if (res.ok && res.deduction) {
-          recalculateSummary((prev) => [res.deduction, ...prev]);
+          recalculateSummary({
+            deductionsUpdater: (prev) => [res.deduction, ...prev],
+          });
           setIsAddingDeduction(false);
           setSelectedBudgetId(null);
         } else {
@@ -377,9 +440,10 @@ export default function FinancialHorizonClient({
         item.budget_id ?? null
       );
       if (res.ok && res.deduction) {
-        recalculateSummary((prev) =>
-          prev.map((d) => (d.id === item.id ? res.deduction : d))
-        );
+        recalculateSummary({
+          deductionsUpdater: (prev) =>
+            prev.map((d) => (d.id === item.id ? res.deduction : d)),
+        });
       }
     });
   };
@@ -388,56 +452,12 @@ export default function FinancialHorizonClient({
     startTransition(async () => {
       const res = await deleteDeductionAction(id);
       if (res.ok) {
-        recalculateSummary((prev) => prev.filter((d) => d.id !== id));
+        recalculateSummary({
+          deductionsUpdater: (prev) => prev.filter((d) => d.id !== id),
+        });
       } else {
         setErrorMsg(res.error ?? "Failed to delete item.");
       }
-    });
-  };
-
-  const recalculateSummary = (updater: (prev: DeductionItem[]) => DeductionItem[]) => {
-    setSummary((prev) => {
-      const newDeductions = updater(prev.deductions);
-      const totalDeductions = newDeductions
-        .filter((d) => d.is_active)
-        .reduce((sum, d) => sum + d.amount, 0);
-      const remainingAmount = prev.base_amount - totalDeductions;
-      const committedRatio =
-        prev.base_amount > 0
-          ? Math.round((totalDeductions / prev.base_amount) * 10000) / 100
-          : 0;
-
-      // Recalculate budget used amounts from active deductions
-      const budgetUsedMap: Record<number, number> = {};
-      newDeductions.forEach((d) => {
-        if (d.is_active && d.budget_id) {
-          budgetUsedMap[d.budget_id] = (budgetUsedMap[d.budget_id] ?? 0) + d.amount;
-        }
-      });
-
-      const updatedBudgets = (prev.budgets ?? []).map((b) => {
-        const usedAmount = budgetUsedMap[b.id] ?? 0;
-        const availableAmount = b.allocated_amount - usedAmount;
-        const usagePercentage =
-          b.allocated_amount > 0
-            ? Math.round((usedAmount / b.allocated_amount) * 10000) / 100
-            : 0;
-        return {
-          ...b,
-          used_amount: usedAmount,
-          available_amount: availableAmount,
-          usage_percentage: usagePercentage,
-        };
-      });
-
-      return {
-        ...prev,
-        total_deductions: totalDeductions,
-        remaining_amount: remainingAmount,
-        committed_ratio: committedRatio,
-        deductions: newDeductions,
-        budgets: updatedBudgets,
-      };
     });
   };
 
@@ -535,7 +555,10 @@ export default function FinancialHorizonClient({
           data.notes
         );
         if (res.ok && res.transaction) {
-          setTransactions((prev) => prev.map((t) => (t.id === data.id ? res.transaction : t)));
+          recalculateSummary({
+            transactionsUpdater: (prev) =>
+              prev.map((t) => (t.id === data.id ? res.transaction : t)),
+          });
           setIsTransactionDialogOpen(false);
           setEditingTransaction(null);
         } else {
@@ -551,7 +574,9 @@ export default function FinancialHorizonClient({
           data.notes
         );
         if (res.ok && res.transaction) {
-          setTransactions((prev) => [res.transaction, ...prev]);
+          recalculateSummary({
+            transactionsUpdater: (prev) => [res.transaction, ...prev],
+          });
           setIsTransactionDialogOpen(false);
         } else {
           setErrorMsg(res.error ?? "Failed to add transaction.");
@@ -566,7 +591,9 @@ export default function FinancialHorizonClient({
     startTransition(async () => {
       const res = await deleteTransactionAction(txToDelete.id);
       if (res.ok) {
-        setTransactions((prev) => prev.filter((t) => t.id !== txToDelete.id));
+        recalculateSummary({
+          transactionsUpdater: (prev) => prev.filter((t) => t.id !== txToDelete.id),
+        });
         setTxToDelete(null);
       } else {
         setErrorMsg(res.error ?? "Failed to delete transaction.");
